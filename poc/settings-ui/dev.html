@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="dark" />
+        <title>spw-folia · 歌词样式 (dev fake bridge)</title>
+        <script>
+            // Dev-only: show a runtime error on screen (headless screenshots have no console).
+            (function () {
+                var show = function (text) {
+                    var box = document.createElement('pre');
+                    box.setAttribute('data-dev-error', '');
+                    box.style.cssText = 'position:fixed;inset:16px;z-index:99999;margin:0;padding:16px;overflow:auto;background:#2b0b0b;color:#ffd7d7;font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap;pointer-events:auto;border:1px solid #7a2626;border-radius:8px';
+                    box.textContent = String(text).slice(0, 8000);
+                    document.body.appendChild(box);
+                };
+                window.addEventListener('error', function (e) { show('window error: ' + (e.error && e.error.stack || e.message)); });
+                window.addEventListener('unhandledrejection', function (e) { show('unhandled rejection: ' + (e.reason && e.reason.stack || e.reason)); });
+            })();
+        </script>
+    </head>
+    <body class="overflow-hidden">
+        <div id="root" class="fixed inset-0"></div>
+        <script type="module" src="/src/devMain.tsx"></script>
+    </body>
+</html>

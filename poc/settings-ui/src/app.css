@@ -1,0 +1,120 @@
+@import 'tailwindcss';
+
+/* Folia's global font stacks (work/…/src/index.css @theme): the settings window inherits
+ * `font-sans`, whose CJK families Folia adds ahead of the system sans fallbacks. */
+@theme {
+    --font-cjk-sans: "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans JP", "Source Han Sans JP";
+    --font-cjk-serif: "Noto Serif CJK SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", "Noto Serif JP", "Source Han Serif JP";
+    --font-sans: ui-sans-serif, system-ui, var(--font-cjk-sans), sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, var(--font-cjk-serif), serif;
+}
+@source '../../../work/folia/folia-major-main/src/components';
+@source '../../../work/folia/folia-major-main/src/hooks';
+@source '../../../work/folia/folia-major-main/src/utils';
+@source './';
+
+/* The settings kit (Folia's kit.css) colours itself from --st-* tokens set by StudioWindow's
+ * settingsTokens(); text colour comes from the global --text-primary the host page owns. */
+:root {
+    --text-primary: #e4e4e7;
+}
+
+html,
+body,
+#root {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    background-color: #09090b;
+    color: var(--text-primary);
+    font-family: 'Inter', var(--font-cjk-sans), sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+}
+
+/* Injected mode: the visualizer page behind stays visible through the dim layer. */
+body.spw-injected {
+    background-color: transparent;
+}
+
+/* Folia's custom scrollbar (src/index.css) so the scrolled tab column paints the same. */
+:root {
+    --scrollbar-track: #18181b;
+    --scrollbar-thumb: #3f3f46;
+    --scrollbar-thumb-hover: #52525b;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+@font-face {
+    font-family: 'Folia Noto Serif SC';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://cdn.jsdmirror.cn/npm/@fontsource/noto-serif-sc@5.2.9/files/noto-serif-sc-chinese-simplified-400-normal.woff2')
+        format('woff2');
+}
+
+@font-face {
+    font-family: 'Folia Noto Serif SC';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://cdn.jsdmirror.cn/npm/@fontsource/noto-serif-sc@5.2.9/files/noto-serif-sc-chinese-simplified-500-normal.woff2')
+        format('woff2');
+}
+
+/* protocol §7.5 v1 chrome: the gear that summons the settings overlay (fades with the cursor). */
+.spw-chrome-btn {
+    position: fixed;
+    /* mount.tsx root sets pointer-events:none; re-enable hit-testing for the visible gear */
+    pointer-events: auto;
+    top: 24px;
+    right: 24px;
+    z-index: 2147483001;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.28);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    color: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    transition: opacity 0.25s ease, transform 0.25s ease, background 0.15s ease;
+}
+
+.spw-chrome-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+}
+
+.spw-chrome-btn[data-visible='false'] {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+    pointer-events: none;
+}
+
+.spw-chrome-btn:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.6);
+    outline-offset: 2px;
+}

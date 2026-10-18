@@ -1,0 +1,3 @@
+file.encoding=UTF-8 native=GBK
+0: D:/输出目录/dsh2/packaging/web
+   hex=443a2fe8be93e587bae79baee5bd952f647368322f7061636b6167696e672f776562
