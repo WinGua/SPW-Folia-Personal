@@ -1,6 +1,11 @@
 /* The stage's big sample frame. Folia draws its live renderer here; the injected settings window
  * shows a real captured frame of the selected style instead (docs/folia-spec/assets.md explains
- * why: the live renderer needs the full playback data pipeline).
+ * why: the live renderer needs the whole playback data pipeline, which the injected page has not).
+ *
+ * The sample still has to move, and its pause/play button has to work (m03640). Rather than animate
+ * any one style's real renderer, the frame itself drifts slowly — a gentle Ken Burns zoom/pan — and
+ * the pause button freezes/resumes that drift. It stays a still, so nothing depends on audio or on
+ * playback state, but the box visibly lives while the song plays.
  *
  * Switching styles crossfades: the outgoing frame stays behind while the incoming one animates in
  * via the `spw-preview-in` CSS keyframes. NOTE: a previous implementation drove both layers from a
@@ -13,11 +18,13 @@ import type { StyleMode } from './settings';
 
 interface StylePreviewProps {
     mode: StyleMode;
+    /** The stage's pause button: freezes/resumes the drift of the sample frame. */
+    paused?: boolean;
 }
 
 const CROSSFADE_MS = 220;
 
-const StylePreview: React.FC<StylePreviewProps> = ({ mode }) => {
+const StylePreview: React.FC<StylePreviewProps> = ({ mode, paused = false }) => {
     const src = getStyleEntry(mode).thumb;
     const [previous, setPrevious] = useState<string | null>(null);
     const lastSrc = useRef<string>(src);
@@ -31,7 +38,10 @@ const StylePreview: React.FC<StylePreviewProps> = ({ mode }) => {
     }, [src]);
 
     return (
-        <>
+        <div
+            className="spw-preview-drift absolute inset-0"
+            style={{ animationPlayState: paused ? 'paused' : 'running' }}
+        >
             {previous && previous !== src && (
                 <img
                     key={previous}
@@ -49,7 +59,7 @@ const StylePreview: React.FC<StylePreviewProps> = ({ mode }) => {
                 draggable={false}
                 className="spw-preview-in absolute inset-0 h-full w-full object-cover"
             />
-        </>
+        </div>
     );
 };
 

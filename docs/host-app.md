@@ -418,3 +418,11 @@ Evidence: `packaging/out/repro-java-fullscreen.{log,png}`,
 `packaging/out/repro-javaw-fullscreen.{log,png}` (full-screen 3201×2001 capture with the settings
 gear chrome from task-5), `poc/webview/host/out/task9-fullscreen-standalone.png`. After the fix the
 packaged acceptance test still passes 10/10 (`docs/release.md` §6).
+
+## 10. 早期 stdin 健壮性（2026-10-19）
+
+插件按协议 §6 在 spawn 后**立刻**发 `hello`/`settings`，此时 WebView2 控制器可能尚未创建。旧实现 `PostToPage` 直接访问 `webView.CoreWebView2`，会记一条 `error: post-page: NullReferenceException`（不影响后续渲染，但污染日志，且暴露早发数据被丢弃）。现在：
+
+- `PostToPage` 在 `webviewReady == false` 或 `CoreWebView2 == null` 时记 `debug post-page-skip reason=not-ready bytes=N` 后返回，不再抛 NRE；
+- `settings`/`config` 原本就在 `NavigationCompleted` 重发；`lyrics`/`track` 现在缓存最后一份 payload，并在导航完成时回放（此前早发的 lyrics/track 会丢失，设置页输入区/歌词预览可能为空）；
+- 回归：`node tmp-verify/early-stdin-test.mjs`（250 ms 早发 hello+settings+lyrics+track+config）→ 0 NRE、3 次正确 skip、`ready` at 514 ms、页面 3 canvases 且 settings root 已挂载、正常 `closed{reason:"plugin"}`；`poc/hook/probe-live-preview.mjs` 默认/`--self-test` 两种模式复验 11/11 PASS（`docs/verification-live-preview.md` §7）。当前 exe sha256 `d0961bb65acc4fb1e4883c71594fbd004054c37bed9dd5a584a7fad81e717542`。

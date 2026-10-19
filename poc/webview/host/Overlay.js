@@ -7,6 +7,9 @@
 //           H hint. The host maps its `settings` stdin command to __SPW_FOLIA_OVERLAY__.toggle().
 (function () {
   'use strict';
+  // AddScriptToExecuteOnDocumentCreated runs in every frame, including the settings-page preview
+  // iframe; the placeholder HUD must only exist in the top-level Folia surface.
+  if (window.top !== window) return;
   if (window.__SPW_FOLIA_OVERLAY__) return;
 
   var MODES = [

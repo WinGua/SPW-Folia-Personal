@@ -27,6 +27,10 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
 - **Folia's settings page, 1:1** — the 「歌词样式」 window (tabs 歌词动画 / 背景 / 字体 / 字幕,
   14-style live grid, 默认 reset, 纹理分辨率, 镜头运动强度, 文字动势, per-style tunings)
   reusing Folia's own React components.
+- **Live style preview in the settings page** (v0.1.6) — the big preview on the 「歌词样式」 page is
+  not a static screenshot but Folia's real renderer running frame by frame inside a same-origin iframe:
+  style, texture resolution, camera motion, typography, background and theme changes apply live, and
+  the pause/play button genuinely freezes and resumes the picture.
 - **Cover-colour theming** — theme, background tint and accent are derived from the current track's
   album art (fixed in v0.1.2) and follow cover changes live.
 - **Synced to SPW playback** — track, lyrics timeline (word-level cells), subtitle translation,
@@ -52,6 +56,27 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   (SPW's internal names are obfuscated per release); the plugin refuses to install the hook on other
   versions. See [docs/hook-target.md](docs/hook-target.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
+
+## What's new in v0.1.6
+
+- **The settings-page big preview now runs the real Folia renderer** — instead of a static style frame,
+  the 「歌词样式」 preview hosts Folia's own OBS page and rendering pipeline in a same-origin
+  `preview.html` iframe, so style, texture resolution, camera motion, text dynamics, fonts, background
+  and theme changes apply live; the pause/play button really freezes and resumes the picture. The
+  v0.1.5 static Ken Burns frame remains only as a fallback when the iframe is unavailable.
+- **Pause means fully static** — the child frame wraps `requestAnimationFrame` with an rAF gate at
+  `document_start`, so while paused the renderer/particle/grain loops stop entirely and resume flushes
+  the queue; hiding the overlay freezes the child frame so the hidden 1080p renderer does not spin.
+- **Lightweight wiring** — the renderer runs only in the child frame; the settings bundle grows by just
+  ~12 KB (~1.06 MB) and the release package by ~0.7 MB vs v0.1.4. A 4 s readiness timeout falls back to
+  the static frame, and five open/close cycles reuse the same iframe without leaks.
+- **Host fix** — `hello`/`settings` received before WebView2 is ready no longer triggers a `post-page`
+  null reference; cached lyrics/track are replayed after a page reload.
+- Evidence: [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) (probe
+  11/11 PASS, paused visible-area frame diff ratio 0.00000 / mean 0); the contract with the main
+  publisher is in [docs/live-preview-iframe.md](docs/live-preview-iframe.md).
+
+![The settings-page big preview drawn live by the real Folia renderer inside an iframe](docs/images/live-preview.jpg)
 
 ## What's new in v0.1.4
 
@@ -112,6 +137,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | Fullscreen 3200x2000 at 175% DPI, page 1776x1110 dpr1, 3 canvases, 110-120 fps; stable 16-min soak (66-67.5 MB working set) | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
 | Playhead + word-level lyrics advance from SPW playback (100 ms interpolated timeline); pause/resume and seek follow | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
 | Real mouse input: hover ⚙ opens the 歌词样式 overlay, ← returns to the renderer, ESC closes (exit 0) | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
+| v0.1.6: the settings-page big preview is the real Folia renderer inside an iframe (3 canvases, paused frame diff 0.00000, instant style switch, one reused iframe across 5 open/close cycles, 0 page errors) | [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) |
 | **Folia** item matches host menu typography/sparkle icon (v0.1.1); **cover-colour theming** follows the album art (v0.1.2: orange vs black cover mean RGB 165/105/66 vs 71/71/72); **v0.1.3**: mod-manager author = `azkbzxf`, inert controls removed, font family/weight + subtitle fonts effective | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
@@ -124,7 +150,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
 Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
 
-1. Download `spw-folia-0.1.4.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.1.6.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -142,7 +168,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.4.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.6.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -155,8 +181,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.4.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.4.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.6.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.6.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 

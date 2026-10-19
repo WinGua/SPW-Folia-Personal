@@ -9,15 +9,25 @@
     "preview": "vite preview --port 18091"
   },
   "dependencies": {
+    "@chenglou/pretext": "0.0.9",
+    "@react-three/drei": "10.7.8",
+    "@react-three/fiber": "9.8.1",
+    "@react-three/postprocessing": "3.1.2",
+    "blueimp-md5": "2.19.0",
     "dexie": "^4.4.6",
     "framer-motion": "^13.4.3",
     "i18next": "^26.4.2",
+    "i18next-browser-languagedetector": "8.2.1",
     "lucide-react": "^1.48.0",
+    "pixi.js": "8.21.0",
     "react": "^19.3.0",
     "react-colorful": "^5.8.1",
     "react-dom": "^19.3.0",
     "react-i18next": "^17.0.15",
     "react-window": "^2.3.4",
+    "three": "0.185.1",
+    "twgl.js": "7.0.0",
+    "wanakana": "5.3.1",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

@@ -69,6 +69,14 @@ export interface ConfigPublisherHandle {
     republish: () => void;
 }
 
+/** The theme the live publisher last used (font settings already applied). The live preview inside
+ *  the settings window renders with the same theme, so it must not guess: it asks for this. */
+let lastPublishedTheme: Theme | null = null;
+let lastPublishedSubtitleTheme: Theme | null = null;
+
+export const getLastPublishedTheme = (): Theme | null => lastPublishedTheme;
+export const getLastPublishedSubtitleTheme = (): Theme | null => lastPublishedSubtitleTheme;
+
 export const useConfigPublisher = (): void => {
     useEffect(() => {
         const bridge = getBridge();
@@ -89,6 +97,8 @@ export const useConfigPublisher = (): void => {
                     fontStyle: state.subtitle.subtitleFontStyle,
                     fontWeight: state.subtitle.subtitleFontWeight,
                 });
+            lastPublishedTheme = theme;
+            lastPublishedSubtitleTheme = subtitleTheme;
             return { settings: snapshotFromState(state), theme, subtitleTheme };
         };
 

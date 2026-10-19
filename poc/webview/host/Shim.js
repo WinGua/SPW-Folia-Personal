@@ -12,11 +12,33 @@
 //   3. Diagnostics: page errors, console errors, rAF FPS/heap, key events -> host.
 (function () {
   'use strict';
+  // Host Shim is injected into every frame by AddScriptToExecuteOnDocumentCreated. The settings
+  // preview iframe has its own child shim (PreviewShim.js); never install the host bridge there.
+  if (window.top !== window) return;
   if (window.__SPW_FOLIA_SHIM__) return;
   window.__SPW_FOLIA_SHIM__ = true;
 
   var PROTOCOL = 1;
   var listeners = {};
+
+  // Purge any legacy Service Worker / Cache Storage left in the WebView2 profile by older builds.
+  // Folia's original web bundle registered a PWA service worker for https://spw-folia.local/; a stale
+  // registration can intercept the /preview.html navigation of the settings live-preview iframe and
+  // answer with an old cached index.html (seen as "iframe loads but has no preview shim"). We run from
+  // virtual-host files only, so no SW is ever needed: unregister + clear caches for this origin.
+  try {
+    if (window.navigator && navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        for (var i = 0; i < regs.length; i++) { try { regs[i].unregister(); } catch (e) { } }
+      }).catch(function () { });
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(function (keys) {
+        for (var i = 0; i < keys.length; i++) { try { caches.delete(keys[i]); } catch (e) { } }
+      }).catch(function () { });
+    }
+  } catch (e) { }
+
   var lastEvents = {};           // last SSE payload per event name
   var lastConfig = null;
   var lastClock = null;
@@ -59,7 +81,8 @@
   }
 
   window.addEventListener('error', function (e) {
-    post({ type: 'log', level: 'error', msg: 'js: ' + String((e && (e.message || e.error)) || 'unknown') + ' @ ' + String((e && e.filename) || '') + ':' + ((e && e.lineno) || 0) });
+    var stack = e && e.error && e.error.stack ? String(e.error.stack).replace(/\s+/g, ' ').slice(0, 6000) : '';
+    post({ type: 'log', level: 'error', msg: 'js: ' + String((e && (e.message || e.error)) || 'unknown') + ' @ ' + String((e && e.filename) || '') + ':' + ((e && e.lineno) || 0) + (stack ? ' | stack: ' + stack : '') });
   });
   window.addEventListener('unhandledrejection', function (e) {
     post({ type: 'log', level: 'error', msg: 'rejection: ' + String((e && e.reason) || 'unknown') });
@@ -71,7 +94,7 @@
       try {
         var parts = [];
         for (var i = 0; i < arguments.length && i < 6; i++) parts.push(String(arguments[i]));
-        post({ type: 'log', level: 'error', msg: 'console: ' + parts.join(' ').slice(0, 500) });
+        post({ type: 'log', level: 'error', msg: 'console: ' + parts.join(' ').slice(0, 6000) });
       } catch (e) { }
       return orig.apply(console, arguments);
     };

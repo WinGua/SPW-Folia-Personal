@@ -22,7 +22,16 @@ const resolveContainer = (injected: boolean): HTMLElement => {
 export const mountSettingsUi = (): void => {
     if (root) return;
     const injected = bridgeIsInjected();
-    root = createRoot(resolveContainer(injected));
+    root = createRoot(resolveContainer(injected), {
+        // Keep crashes visible in the host log with a component stack: the injected page has no
+        // dev-time overlay and the host's `js:` line only carries the JavaScript stack.
+        onUncaughtError: (error: unknown, errorInfo: { componentStack?: string }) => {
+            console.error(`[spw-folia] uncaught: ${String(error)}\n${errorInfo.componentStack ?? ''}`);
+        },
+        onCaughtError: (error: unknown, errorInfo: { componentStack?: string }) => {
+            console.error(`[spw-folia] caught: ${String(error)}\n${errorInfo.componentStack ?? ''}`);
+        },
+    });
     root.render(<App injected={injected} />);
     (window as Window & { __SPW_FOLIA_SETTINGS_UI_READY__?: boolean }).__SPW_FOLIA_SETTINGS_UI_READY__ = true;
 };

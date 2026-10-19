@@ -45,6 +45,10 @@ namespace SpwFolia
         private long navDoneAt;
         private long shotAtTick;
         private string currentUrl;
+        // Early stdin is legal (protocol §1 allows hello/settings/config/lyrics before the page is up).
+        // The last lyrics/track payloads are cached so they can be replayed once navigation completes.
+        private string lastLyricsPayload;
+        private string lastTrackPayload;
 
         // stdin state -> clock anchor (interpolated between 100 ms state messages)
         private readonly object stateGate = new object();
@@ -435,7 +439,10 @@ namespace SpwFolia
                     // after a plugin upgrade. Tie the URL to the plugin version (protocol hello.bundleVersion).
                     string bundleVersion = string.IsNullOrEmpty(args.BundleVersion) ? "dev" : args.BundleVersion;
                     string entryUrl = "https://" + Program.SettingsHost + "/" + args.SettingsEntry + "?v=" + Uri.EscapeDataString(bundleVersion);
-                    string inject = "(function(){var s=document.createElement('script');s.type='module';s.src='"
+                    // Iframe guard: AddScriptToExecuteOnDocumentCreated runs in every frame, so without
+                    // the top-window check the settings UI would mount a second time inside the live
+                    // preview iframe (double overlay / React-root conflict).
+                    string inject = "(function(){if(window.top!==window)return;var s=document.createElement('script');s.type='module';s.src='"
                         + JsonUtil.Escape(entryUrl)
                         + "';document.head?document.head.appendChild(s):document.addEventListener('DOMContentLoaded',function(){document.head.appendChild(s)});})();";
                     log.Log("info", "settings-inject url=" + entryUrl);
@@ -487,6 +494,10 @@ namespace SpwFolia
 
             SendHelloToPage();
             SendSettingsToPage();
+            // Replay lyrics/track that arrived over stdin before the page was ready (protocol §1
+            // allows them early; dropping them would leave the settings preview and page inputs empty).
+            if (lastLyricsPayload != null) PostToPage(lastLyricsPayload);
+            if (lastTrackPayload != null) PostToPage(lastTrackPayload);
             if (configDirty) SendConfigIfNeeded();
         }
 
@@ -717,6 +728,14 @@ namespace SpwFolia
 
         private void PostToPage(string payload)
         {
+            if (!webviewReady || webView == null || webView.CoreWebView2 == null)
+            {
+                // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
+                // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
+                // track are cached by their callers and flushed on navigation completion.
+                log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
+                return;
+            }
             try { webView.CoreWebView2.PostWebMessageAsJson(payload); }
             catch (Exception ex) { log.Error("post-page", ex); }
         }
@@ -969,6 +988,7 @@ namespace SpwFolia
             if (msg.TryGetValue("offsetMs", out offset)) payload += ",\"offsetMs\":" + JsonUtil.Num(ToDouble(offset));
             if (msg.TryGetValue("translationMode", out mode)) payload += ",\"translationMode\":\"" + JsonUtil.Escape(Convert.ToString(mode, Inv)) + "\"";
             payload += "}";
+            lastLyricsPayload = payload;
             PostToPage(payload);
         }
 
@@ -999,7 +1019,8 @@ namespace SpwFolia
             object duration;
             if (msg.TryGetValue("durationMs", out duration)) sb.Append(",\"durationMs\":").Append(JsonUtil.Num(ToDouble(duration)));
             sb.Append('}');
-            PostToPage(sb.ToString());
+            lastTrackPayload = sb.ToString();
+            PostToPage(lastTrackPayload);
         }
 
         // config is built page-side in production (settings publisher). The embedded demo config is a

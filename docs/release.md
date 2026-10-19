@@ -348,3 +348,27 @@ payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.4.spmod 86,
 v0.1.4 changes: the settings page's big style preview now follows the selected style (effect keyed on
 the target src + CSS `spw-preview-in` fade). See `docs/verification-v0.1.4.md`,
 `docs/release-notes-v0.1.4.md`.
+
+### v0.1.6 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.6.spmod   13,136,350 B   1,941 entries
+sha256  aacd02afb078b13d09a26930f6981740930df5dfe04343b7a9584cfd84bdcad9
+manifest: Plugin-Version 0.1.6 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.6.spmod 86,955 B
+        native/spw-folia-host.exe  : d0961bb65acc4fb1e4883c71594fbd004054c37bed9dd5a584a7fad81e717542
+                                     117,248 B (PostToPage not-ready guard + lyrics/track replay)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,061,824 B; preview.html; _host/preview-shim.js;
+                                     placeholder_cover*.jpg; preview assets)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.6.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.6.spmod
+(re-assembling from the same staging tree reproduced the identical sha256)
+```
+
+v0.1.5 (static Ken Burns preview) was never released; v0.1.6 replaces it with the real Folia renderer
+inside a same-origin iframe (rAF-gated pause that truly freezes the frame, static-frame fallback,
+iframe reuse across open/close). See `docs/verification-v0.1.5.md`,
+`docs/verification-live-preview-ui.md`, `docs/live-preview-iframe.md`, `docs/release-notes-v0.1.6.md`.

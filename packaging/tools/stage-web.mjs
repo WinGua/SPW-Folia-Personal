@@ -106,12 +106,56 @@ for (const name of ['Shim.js', 'Overlay.js']) {
   if (existsSync(src)) { copyFileSync(src, join(hostOut, name.toLowerCase())); hostScripts++; }
 }
 
+// Live preview (docs/live-preview-iframe.md): the settings overlay embeds preview.html in a
+// same-origin iframe. PreviewShim.js is a classic script inside that iframe (NOT injected by the
+// host) that replaces EventSource and synthesizes clock/audio locally.
+let previewShimCopied = false;
+const previewShimSrc = join(hostSrc, 'PreviewShim.js');
+if (existsSync(previewShimSrc)) {
+  copyFileSync(previewShimSrc, join(hostOut, 'preview-shim.js'));
+  previewShimCopied = true;
+} else {
+  console.warn(`[stage-web] WARNING missing ${relative(ROOT, previewShimSrc)} — preview.html would break`);
+}
+
+// preview.html = the patched index.html plus one classic script tag in <head>, placed before the
+// first <script> so it runs before the deferred module entry (classic scripts execute immediately).
+const PREVIEW_SHIM_TAG = '<script src="/_host/preview-shim.js"></script>';
+let previewHtml = false;
+const indexHtml = readFileSync(join(out, 'index.html'), 'utf8');
+const firstScript = indexHtml.indexOf('<script');
+const previewSource = firstScript >= 0
+  ? indexHtml.slice(0, firstScript) + PREVIEW_SHIM_TAG + '\n' + indexHtml.slice(firstScript)
+  : indexHtml.replace('</head>', PREVIEW_SHIM_TAG + '\n</head>');
+if (previewSource.indexOf(PREVIEW_SHIM_TAG) >= 0) {
+  writeFileSync(join(out, 'preview.html'), previewSource);
+  previewHtml = true;
+}
+
+// Stable placeholder covers for the preview track (dist filenames carry content hashes).
+const previewCovers = {};
+const assetsOut = join(out, 'assets');
+if (existsSync(assetsOut) && previewHtml) {
+  const jpgs = readdirSync(assetsOut).filter((n) => /^placeholder_cover.*\.jpg$/i.test(n));
+  const base = jpgs.find((n) => /^placeholder_cover-[^-]/.test(n) && !/^placeholder_cover-2-/.test(n)) || null;
+  const reserved = jpgs.find((n) => /^placeholder_cover-2-/.test(n)) || null;
+  const previewDir = join(out, 'preview');
+  mkdirSync(previewDir, { recursive: true });
+  if (base) { copyFileSync(join(assetsOut, base), join(previewDir, 'placeholder_cover.jpg')); previewCovers.placeholder_cover = `assets/${base}`; }
+  if (reserved) { copyFileSync(join(assetsOut, reserved), join(previewDir, 'placeholder_cover-2.jpg')); previewCovers.placeholder_cover2 = `assets/${reserved}`; }
+  if (!base) console.warn('[stage-web] WARNING no assets/placeholder_cover-*.jpg found; preview cover degrades to none');
+  if (!reserved) console.warn('[stage-web] WARNING no assets/placeholder_cover-2-*.jpg found; reserved preview cover missing');
+}
+
 const summary = {
   generatedAt: new Date().toISOString(),
   out: relative(ROOT, out).replace(/\\/g, '/'),
   webFiles: copied,
   webBytes: bytes,
   hostScriptCopies: hostScripts,
+  previewShimCopied,
+  previewHtml,
+  previewCovers,
   settingsFiles,
   settingsBytes,
   totalBytes: bytes + settingsBytes,
@@ -121,4 +165,4 @@ const summary = {
   files: copiedList,
 };
 writeFileSync(resolve(ROOT, 'packaging/web-stage-report.json'), JSON.stringify(summary, null, 2));
-console.log(JSON.stringify({ webFiles: copied, webBytes: bytes, settingsFiles, settingsBytes, totalBytes: bytes + settingsBytes, missing: missing.length, indexHtmlPatched: summary.indexHtmlPatched }, null, 2));
+console.log(JSON.stringify({ webFiles: copied, webBytes: bytes, settingsFiles, settingsBytes, totalBytes: bytes + settingsBytes, missing: missing.length, indexHtmlPatched: summary.indexHtmlPatched, previewShimCopied, previewHtml, previewCovers }, null, 2));

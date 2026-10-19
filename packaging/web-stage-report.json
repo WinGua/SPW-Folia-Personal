@@ -1,12 +1,18 @@
 {
-  "generatedAt": "2026-10-19T05:00:56.045Z",
+  "generatedAt": "2026-10-19T10:18:48.437Z",
   "out": "packaging/web",
   "webFiles": 1877,
   "webBytes": 20546706,
   "hostScriptCopies": 2,
+  "previewShimCopied": true,
+  "previewHtml": true,
+  "previewCovers": {
+    "placeholder_cover": "assets/placeholder_cover-CufMMif3.jpg",
+    "placeholder_cover2": "assets/placeholder_cover-2-BuqqkGqf.jpg"
+  },
   "settingsFiles": 15,
-  "settingsBytes": 2273095,
-  "totalBytes": 22819801,
+  "settingsBytes": 2280850,
+  "totalBytes": 22827556,
   "excluded": {
     "swTrio": [
       "registerSW.js",

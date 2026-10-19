@@ -56,3 +56,7 @@ poc/hook/acceptance/
 
 # transient verification fixtures (poc/hook/verify-cover.mjs outputs)
 /tmp-verify/
+
+# local-only hook artifacts: installed-plugin backups and ad-hoc verification fixtures
+poc/hook/backup/
+poc/hook/tmp-verify/

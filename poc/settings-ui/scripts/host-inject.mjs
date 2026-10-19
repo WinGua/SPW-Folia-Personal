@@ -35,6 +35,9 @@ const shotPath = path.join(OUT, opt('shot', 'settings-inject.png'));
 const fullscreen = argv.includes('--fullscreen');
 const forceDsf = opt('force-dsf', null);
 const logPath = path.join(OUT, 'settings-inject.log.jsonl');
+// WebView2 keeps a disk cache per user-data dir: preview.html/_host scripts edited between runs are
+// served stale from that cache, so verification runs should pass a fresh profile.
+const profileDir = path.resolve(String(opt('profile', path.join(OUT, 'webview2-profile-settings'))));
 // --bundle <dir> overrides the Folia dist root; --auto-settings drops --settings-dir/--settings-entry
 // so the host discovers the packaged `settings/` subdir on its own (packaging/web verification).
 const BUNDLE = path.resolve(String(opt('bundle', BUNDLE_DEFAULT)));
@@ -52,7 +55,7 @@ const args = [
     '--screenshot', shotPath,
     '--shot-at', String(shotAtMs),
     '--duration', String(durationMs),
-    '--user-data', path.join(OUT, 'webview2-profile-settings'),
+    '--user-data', profileDir,
     '--title', 'spw-folia settings UI injection',
     '--demo',
 ];
