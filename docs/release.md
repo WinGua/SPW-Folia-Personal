@@ -396,3 +396,27 @@ painting its background, so lyrics float over the desktop. Because colour-key wi
 click-through, a bottom-left「恢复不透明背景 · Ctrl+Alt+B」chip (plus Ctrl+Alt+B / Ctrl+Alt+Y /
 Ctrl+Alt+P / Ctrl+Alt+Shift+B hotkeys) restores opacity and syncs the page switch. See
 `docs/verification-v0.1.7.md`, `docs/live-transparency.md`, `docs/release-notes-v0.1.7.md`.
+
+### v0.1.8 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.8.spmod   12,976,142 B   1,941 entries
+sha256  0913914b37ba5a1b4b8db7775ebb1b7ab1621d1a069a000c43766c4c62b9ad1f
+manifest: Plugin-Version 0.1.8 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.8.spmod 86,953 B
+        native/spw-folia-host.exe  : 130,560 B (transparent input catcher + click chip + hotkey toggle)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,066,831 B; clickable-transparency note)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.8.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.8.spmod
+```
+
+v0.1.8 fixes two field problems. (1) The lyrics bridge now pushes lyrics on its own 100 ms tick and
+polls the track every 200 ms, covers load right when a track is adopted (0.4 s throttle, shrunk to
+512 px), and the page keeps the previous palette while a cover is missing — so the theme and lyrics
+follow an automatic track change in ~0.4 s. (2) Transparent windows are clickable again: the helper
+adds an invisible `TransparencyInputCatcher` window (alpha = 1/255, `WS_EX_NOACTIVATE`) that forwards
+mouse messages to WebView2's `Chrome_WidgetWin_1` input window. See `docs/verification-v0.1.8.md`,
+`docs/live-transparency.md`, `docs/release-notes-v0.1.8.md`.

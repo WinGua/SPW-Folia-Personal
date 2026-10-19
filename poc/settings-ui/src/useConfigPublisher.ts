@@ -85,6 +85,10 @@ export const useConfigPublisher = (): void => {
         let isDaylight = false;
         let lyrics: PublisherLyricLine[] = toPublisherLyrics(bridge.inputs?.lyrics);
         let track = toPublisherTrack(bridge.inputs?.track, lyrics);
+        // The raw track message, kept so a lyrics event can re-apply it without inventing a track.
+        let trackMessage = bridge.inputs?.track ?? null;
+        // Guards out-of-order async theme derivations (cover A resolving after cover B).
+        let themeToken = 0;
         let disposed = false;
 
         /** settings + theme + subtitleTheme, with the persisted 字体/字幕字体 selections applied. */
@@ -111,8 +115,14 @@ export const useConfigPublisher = (): void => {
         });
 
         const refreshTheme = async () => {
-            const result = await deriveThemeFromCover(track?.coverUrl ?? null, track?.title);
-            if (disposed) return;
+            const cover = track?.coverUrl ?? null;
+            const token = ++themeToken;
+            // A switched song reports its track before the new cover is loaded (v0.1.8): keep the
+            // previous palette instead of flashing the dark fallback, then derive once the cover
+            // data URL actually arrives.
+            if (!cover) return;
+            const result = await deriveThemeFromCover(cover, track?.title);
+            if (disposed || token !== themeToken) return;
             coverTheme = result.theme;
             isDaylight = result.isDaylight;
             publisher.update({ ...themedInputs(), isDaylight });
@@ -129,10 +139,13 @@ export const useConfigPublisher = (): void => {
             publisher.update(themedInputs());
         });
 
-        const offTrack = bridgeOn<BridgeTrackMessage>('track', payload => applyTrack(payload, lyrics));
+        const offTrack = bridgeOn<BridgeTrackMessage>('track', payload => {
+            trackMessage = payload ?? null;
+            applyTrack(trackMessage, lyrics);
+        });
         const offLyrics = bridgeOn<unknown>('lyrics', payload => {
             lyrics = toPublisherLyrics(payload);
-            applyTrack(bridge.inputs?.track ?? null, lyrics);
+            if (trackMessage) applyTrack(trackMessage, lyrics);
         });
         const offSettings = bridgeOn('settings', () => publisher.invalidate());
         const offConfig = bridgeOn('hello', () => publisher.invalidate());

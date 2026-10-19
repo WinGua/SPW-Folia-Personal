@@ -45,6 +45,9 @@ class FoliaPlaybackExtension : PlaybackExtensionPoint {
     private val trackVersion = AtomicLong(0)
     private val lastTrackRefreshMs = AtomicLong(0)
     private val refreshing = AtomicBoolean(false)
+
+    /** Id of the track whose cover is currently being fetched (dedupes out-of-band requests). */
+    private val coverLoadingId = AtomicReference<String?>(null)
     private val trackExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "spw-folia-track").apply { isDaemon = true }
     }
@@ -213,14 +216,37 @@ class FoliaPlaybackExtension : PlaybackExtensionPoint {
             coverDataUrl = null
             trackVersion.incrementAndGet()
             controller.onTrackChanged(item.duration, controller.positionMs().toLong())
+            // Fetch the cover immediately: the pump only pushes a track whose JSON changed, and the
+            // cover is what makes the page derive the new palette (v0.1.8 — auto-advance lag).
+            requestCoverLoad(item)
         } else {
             controller.onDurationChanged(item.duration)
         }
     }
 
+    /**
+     * Loads the cover for [item] on the track executor (deduped per track id), so switching songs
+     * does not depend on the next throttled poll before the theme can follow the new cover.
+     */
+    private fun requestCoverLoad(item: MediaItem) {
+        if (item.id.isEmpty() || coverDataUrl != null) return
+        if (!coverLoadingId.compareAndSet(null, item.id)) return
+        trackExecutor.execute {
+            try {
+                if (coverDataUrl == null && mediaItem?.id == item.id) loadCover(item)
+            } catch (t: Throwable) {
+                FoliaPlugin.logStatic("cover load failed: ${t::class.java.name}: ${t.message}")
+            } finally {
+                coverLoadingId.compareAndSet(item.id, null)
+            }
+        }
+    }
+
     private fun refreshTrackIfStale(force: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (!force && now - lastTrackRefreshMs.get() < 1_500L) return
+        // 400 ms (was 1.5 s): a song switch is noticed by the poll within ~0.4 s even when SPW does
+        // not fire a lyrics callback for it, which is the other half of the v0.1.8 auto-advance fix.
+        if (!force && now - lastTrackRefreshMs.get() < 400L) return
         if (!refreshing.compareAndSet(false, true)) return
         lastTrackRefreshMs.set(now)
         trackExecutor.execute {
@@ -230,8 +256,8 @@ class FoliaPlaybackExtension : PlaybackExtensionPoint {
                 if (item != mediaItem) {
                     adoptMediaItem(item)
                 }
-                if (coverDataUrl == null && item.id.isNotEmpty()) {
-                    loadCover(item)
+                if (coverDataUrl == null) {
+                    requestCoverLoad(item)
                 }
             } catch (t: Throwable) {
                 FoliaPlugin.logStatic("track refresh error: ${t::class.java.name}: ${t.message}")
@@ -243,20 +269,59 @@ class FoliaPlaybackExtension : PlaybackExtensionPoint {
 
     private fun loadCover(item: MediaItem) {
         try {
-            val bytes = WorkshopApi.library.getCoverById(item.id).toCompletableFuture().get(2, TimeUnit.SECONDS)
-            if (bytes == null || bytes.isEmpty()) return
-            val mime = when {
-                bytes.size >= 3 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() -> "image/jpeg"
-                bytes.size >= 8 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() -> "image/png"
-                bytes.size >= 4 && bytes[0] == 0x47.toByte() && bytes[1] == 0x49.toByte() -> "image/gif"
-                bytes.size >= 12 && bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() -> "image/webp"
-                else -> "image/jpeg"
-            }
+            val fetched = WorkshopApi.library.getCoverById(item.id).toCompletableFuture().get(2, TimeUnit.SECONDS)
+            if (fetched == null || fetched.isEmpty()) return
+            val (bytes, mime) = shrinkCover(fetched)
             coverDataUrl = "data:$mime;base64," + Base64.getEncoder().encodeToString(bytes)
             trackVersion.incrementAndGet()
+            FoliaPlugin.logStatic("cover ready id=${item.id} ${fetched.size} -> ${bytes.size} bytes ($mime)")
         } catch (t: Throwable) {
             FoliaPlugin.logStatic("cover load failed: ${t::class.java.name}: ${t.message}")
         }
+    }
+
+    /**
+     * SPW hands over the artwork at full resolution — 6 MB PNG/JPEG covers are common, which turns
+     * every song switch into a multi-megabyte base64 string on the protocol pipe and a slow decode
+     * in the page before the palette can follow (v0.1.8: that lag was one half of the auto-advance
+     * report). The page only samples a 48×48 canvas for the theme, so a 512 px JPEG is plenty.
+     */
+    private fun shrinkCover(raw: ByteArray): Pair<ByteArray, String> {
+        if (raw.size <= COVER_SHRINK_THRESHOLD) return raw to sniffImageMime(raw)
+        return try {
+            val source = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(raw))
+                ?: return raw to sniffImageMime(raw)
+            val longest = maxOf(source.width, source.height)
+            if (longest <= COVER_MAX_EDGE) return raw to sniffImageMime(raw)
+            val scale = COVER_MAX_EDGE.toDouble() / longest
+            val width = maxOf(1, (source.width * scale).toInt())
+            val height = maxOf(1, (source.height * scale).toInt())
+            val target = java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB)
+            val graphics = target.createGraphics()
+            try {
+                graphics.setRenderingHint(
+                    java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR
+                )
+                graphics.drawImage(source, 0, 0, width, height, null)
+            } finally {
+                graphics.dispose()
+            }
+            val out = java.io.ByteArrayOutputStream()
+            javax.imageio.ImageIO.write(target, "jpg", out)
+            out.toByteArray() to "image/jpeg"
+        } catch (t: Throwable) {
+            FoliaPlugin.logStatic("cover shrink skipped: ${t::class.java.name}: ${t.message}")
+            raw to sniffImageMime(raw)
+        }
+    }
+
+    private fun sniffImageMime(bytes: ByteArray): String = when {
+        bytes.size >= 3 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() -> "image/jpeg"
+        bytes.size >= 8 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() -> "image/png"
+        bytes.size >= 4 && bytes[0] == 0x47.toByte() && bytes[1] == 0x49.toByte() -> "image/gif"
+        bytes.size >= 12 && bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() -> "image/webp"
+        else -> "image/jpeg"
     }
 
     private fun isLibraryReadGranted(): Boolean = try {
@@ -270,6 +335,9 @@ class FoliaPlaybackExtension : PlaybackExtensionPoint {
     }
 
     companion object {
+        /** Covers above this size are re-encoded to a small JPEG before they hit the pipe. */
+        private const val COVER_SHRINK_THRESHOLD = 160_000
+        private const val COVER_MAX_EDGE = 512
         @Volatile
         private var instance: FoliaPlaybackExtension? = null
 

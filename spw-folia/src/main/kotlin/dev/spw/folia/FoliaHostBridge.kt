@@ -48,6 +48,14 @@ internal class FoliaHostBridge(
     @Volatile var trackProvider: (() -> String?)? = null
 
     private val lastSentTrack = AtomicReference<String?>(null)
+
+    /**
+     * Lyrics are tracked separately from the track (v0.1.8): SPW parses a new song's lyrics *after*
+     * the track change, so gating the lyrics push on a track-string change meant the page kept the
+     * previous song's lines until the cover (which also mutates the track JSON) arrived — or forever
+     * when the cover load failed. The pump now diffs the cached lyrics JSON every tick.
+     */
+    private val lastSentLyrics = AtomicReference<String?>(null)
     private var pump: ScheduledExecutorService? = null
     private var pumpTicks = 0L
     private var lastLoggedPlaying: Boolean? = null
@@ -133,6 +141,7 @@ internal class FoliaHostBridge(
         pumpTicks = 0L
         lastLoggedPlaying = null
         lastSentTrack.set(null)
+        lastSentLyrics.set(null)
         startStdoutReader(p)
         startExitWatcher(p)
         sendLine(
@@ -188,7 +197,17 @@ internal class FoliaHostBridge(
     }
 
     fun sendLyrics(linesJson: String) {
+        lastSentLyrics.set(linesJson)
         sendLine("{\"t\":\"lyrics\",\"lines\":$linesJson,\"offsetMs\":0}")
+    }
+
+    /** Pushes the cached lyrics only when they changed; returns true when a line went out. */
+    private fun maybeSendLyrics(force: Boolean = false): Boolean {
+        val lyrics = lyricsProvider?.invoke() ?: return false
+        if (!force && lyrics == lastSentLyrics.get()) return false
+        log("lyrics -> helper (${lyrics.length} bytes${if (force) ", replay" else ""})")
+        sendLyrics(lyrics)
+        return true
     }
 
     fun sendTrack(trackJson: String) {
@@ -329,11 +348,7 @@ internal class FoliaHostBridge(
             log("replay track (${track.length} bytes)")
             sendTrack(track)
         }
-        val lyrics = lyricsProvider?.invoke()
-        if (lyrics != null) {
-            log("replay lyrics (${lyrics.length} bytes)")
-            sendLyrics(lyrics)
-        }
+        maybeSendLyrics(force = true)
     }
 
     private fun startPump() {
@@ -360,15 +375,14 @@ internal class FoliaHostBridge(
                 if (pumpTicks % TRACK_CHECK_EVERY_TICKS == 0L) {
                     trackProvider?.invoke()?.let { track ->
                         if (track != lastSentTrack.get()) {
-                            log("track -> helper (${track.length} bytes)")
+                            log("track -> helper (${track.length} bytes, cover=${track.contains("\"coverDataUrl\"")})")
                             sendTrack(track)
-                            lyricsProvider?.invoke()?.let { lyrics ->
-                                log("lyrics -> helper (${lyrics.length} bytes)")
-                                sendLyrics(lyrics)
-                            }
                         }
                     }
                 }
+                // Lyrics ride the same pump but are diffed on their own: SPW delivers them a bit
+                // after the track change, and a cover load failure must not freeze them (v0.1.8).
+                maybeSendLyrics()
             } catch (t: Throwable) {
                 log("pump error: ${t::class.java.name}: ${t.message}")
             }
@@ -421,7 +435,10 @@ internal class FoliaHostBridge(
     companion object {
         /** 100 ms state cadence: docs/protocol.md asks for >=20 Hz; the timeline interpolates. */
         private const val STATE_PERIOD_MS = 100L
-        private const val TRACK_CHECK_EVERY_TICKS = 10L
+
+        /** Track/lyrics are polled every 200 ms (they are cheap cached JSON diffs); the provider
+         *  itself throttles the Workshop API round-trip, see FoliaPlaybackExtension. */
+        private const val TRACK_CHECK_EVERY_TICKS = 2L
         private const val SETTINGS_ENTRY = "settings-ui.js"
         private const val DEV_ROOT = "D:/输出目录/dsh2"
     }

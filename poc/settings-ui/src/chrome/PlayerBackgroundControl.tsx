@@ -65,7 +65,7 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
                 </button>
                 {enabled ? (
                     <p className="spw-player-bg-note">
-                        透明窗口为鼠标穿透：按 Ctrl+Alt+B 或点左下角浮标恢复不透明，ESC 退出播放。
+                        透明窗口内控件仍可点击；Ctrl+Alt+B 或左下角开关可随时切回不透明，ESC 退出播放。
                     </p>
                 ) : null}
             </div>

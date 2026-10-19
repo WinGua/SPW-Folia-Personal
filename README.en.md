@@ -33,7 +33,7 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   not a static screenshot but Folia's real renderer running frame by frame inside a same-origin iframe:
   style, texture resolution, camera motion, typography, background and theme changes apply live, and
   the pause/play button genuinely freezes and resumes the picture.
-- **Transparent player background** (v0.1.7) — the round "sliders" button at the bottom-right corner
+- **Transparent player background** (v0.1.7; clickable in transparent mode since v0.1.8) — the round "sliders" button at the bottom-right corner
   of the fullscreen player opens a small panel with a **播放页透明背景 (transparent player background)**
   switch, placed exactly where SPW's own player page keeps its control button. When it is on, the helper
   window becomes a real colour-key transparent window and Folia stops drawing its background, so lyrics
@@ -63,12 +63,33 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
 - **Pinned to Salt Player for Windows 1.19.0** — the menu hook targets one host build
   (SPW's internal names are obfuscated per release); the plugin refuses to install the hook on other
   versions. See [docs/hook-target.md](docs/hook-target.md).
-- **Transparent mode is mouse click-through** (a property of colour-key windows): while it is on the
-  in-page controls cannot be clicked, which is the intended behaviour for overlay use. A small,
-  non-activating chip appears at the bottom-left ("恢复不透明背景 · Ctrl+Alt+B"); click it or press
-  **Ctrl+Alt+B** (fallbacks Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B) to restore an opaque window,
-  and ESC still exits playback. Details: [docs/live-transparency.md](docs/live-transparency.md).
+- **Transparent mode captures the mouse** (in-page controls are clickable again since v0.1.8): the
+  transparent window covers the desktop and takes clicks for Folia. To use the desktop or other apps,
+  press **Ctrl+Alt+B** (fallbacks Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B), click the switch on the
+  bottom-left chip, or press ESC to exit playback. Details:
+  [docs/live-transparency.md](docs/live-transparency.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
+
+## What's new in v0.1.8
+
+- **Lyrics switch with the track** — the bridge used to push lyrics only when the track payload changed,
+  so after an automatic track change the fullscreen page kept the previous lyrics for seconds. It now
+  compares and pushes lyrics on every 100 ms tick (measured: `track` and `lyrics` 2 ms apart) and polls
+  the track every 200 ms instead of every second.
+- **Covers and theme keep up** — cover loading starts the moment a new track is adopted (0.4 s throttle,
+  de-duplicated per track) and oversized covers are shrunk to 512 px before becoming data URLs; in the
+  real app the track with cover reaches the page in ~0.4 s (worst case used to be 3–4 s). On the page,
+  when the cover has not arrived yet the previous palette is kept, so the theme no longer flashes back to
+  the default night colours.
+- **Clickable while transparent** — transparency no longer means "whole window click-through, hotkey
+  only": the helper adds an invisible input-catcher window (alpha = 1/255, `WS_EX_NOACTIVATE`) that
+  forwards mouse messages to WebView2's input child window. The gold button, panel, switch and gear are
+  all clickable while transparent (verified live: clicking the switch while transparent turns opacity
+  back on immediately).
+- **Escape hatches kept** — the bottom-left chip and **Ctrl+Alt+B** still toggle both ways as a fallback;
+  the chip text now reads "点开关或 Ctrl+Alt+B 恢复不透明".
+- Mechanism: [docs/live-transparency.md](docs/live-transparency.md); verification:
+  [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md).
 
 ## What's new in v0.1.7
 
@@ -176,6 +197,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | Real mouse input: hover ⚙ opens the 歌词样式 overlay, ← returns to the renderer, ESC closes (exit 0) | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
 | v0.1.6: the settings-page big preview is the real Folia renderer inside an iframe (3 canvases, paused frame diff 0.00000, instant style switch, one reused iframe across 5 open/close cycles, 0 page errors) | [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) |
 | v0.1.7: transparent player background (colour-key window really transparent, desktop shows through, bottom-left chip / Ctrl+Alt+B restores opacity and syncs the page switch, re-enable after an escape works, settings tree persisted, ESC exits, chrome still visible while transparent) | [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md) |
+| v0.1.8: lyrics switch with the track (`track`/`lyrics` 2 ms apart), cover shrunk in 0.2 s and on the page in 0.4 s, previous theme kept while a cover is missing; in-page mouse works while transparent (clicking the switch while transparent → `mode=off` + catcher hidden) | [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md) |
 | **Folia** item matches host menu typography/sparkle icon (v0.1.1); **cover-colour theming** follows the album art (v0.1.2: orange vs black cover mean RGB 165/105/66 vs 71/71/72); **v0.1.3**: mod-manager author = `azkbzxf`, inert controls removed, font family/weight + subtitle fonts effective | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
@@ -188,7 +210,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
 Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
 
-1. Download `spw-folia-0.1.7.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.1.8.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -206,7 +228,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.7.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.8.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -219,8 +241,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.7.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.7.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.8.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.8.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 
