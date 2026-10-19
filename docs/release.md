@@ -420,3 +420,27 @@ follow an automatic track change in ~0.4 s. (2) Transparent windows are clickabl
 adds an invisible `TransparencyInputCatcher` window (alpha = 1/255, `WS_EX_NOACTIVATE`) that forwards
 mouse messages to WebView2's `Chrome_WidgetWin_1` input window. See `docs/verification-v0.1.8.md`,
 `docs/live-transparency.md`, `docs/release-notes-v0.1.8.md`.
+
+### v0.1.9 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.9.spmod   12,975,396 B   1,941 entries
+sha256  8ec1ffb3e4dee3c4befbc953f7d36a22ab1864e5e204439c7c16a5233257ce01
+manifest: Plugin-Version 0.1.9 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.9.spmod 89,016 B
+        native/spw-folia-host.exe  : 127,488 B / sha256 5ebc3c97422debfbe02666a4dd4b07a7751b95a13627d34310443fc47b225577
+                                     (hitbox-gated input catcher + mouse passthrough, no chip window)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,069,206 B / sha256 af99b31c0941cb2c42fe953ad2fcffb932ae086195eed18634541bea5fb15216)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.9.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.9.spmod
+```
+
+v0.1.9 replaces the v0.1.7/v0.1.8 bottom-left chip with a **鼠标穿透（操作桌面）** switch in the player
+background panel and makes both chips (gold button + top-right gear) clickable in every state. The page
+reports its hot rectangles (`{"type":"hitbox","vw","vh","rects"}`); the invisible input catcher forwards
+the mouse only inside them and, while passthrough is on, hides itself / synthesises one real left click /
+restores after 220 ms for everything else. Leaving transparency resets `mousePassthrough`. See
+`docs/verification-v0.1.9.md`, `docs/live-transparency.md`, `docs/release-notes-v0.1.9.md`.

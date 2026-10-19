@@ -64,25 +64,48 @@ webView.DefaultBackgroundColor = Color.Black;
    圆钮、面板、开关、齿轮全部可点（真机验证：透明中点击开关 → `transparency mode=off` + catcher 隐藏）。
    探针先验证过这条链路可行（`poc/webview/host/repro/click-post-probe.cs`：向 `Chrome_WidgetWin_1` 投递
    合成消息能让页内 mousedown 计数 0→1→2；而 `WH_MOUSE_LL` 钩子在本机根本不触发，所以没有走钩子路线）。
-   副作用：透明窗口现在会吃掉鼠标，不再穿透到下层窗口（要操作桌面请先切回不透明或 ESC 退出）。
+   捕获窗口会吃掉鼠标，因此 v0.1.8 里透明窗口无法直接操作桌面。
+   **v0.1.9 的改法**：页面把自己的「热区」报给宿主（见 §4.4），捕获窗口只在热区里转发鼠标，
+   热区之外的点击（且「鼠标穿透」开关打开时）会先隐藏自己、用 `mouse_event` 合成一次真实左键，
+   220 ms 后重新显示 —— 于是同一个透明窗口既能点 Folia 的控件，又能点桌面/下层窗口。
 2. **`backdrop-filter` 图层在色键合成下不绘制**（chrome 和面板的 `backdrop-filter: blur()` 会让它们整块消失，但 `CapturePreviewAsync` 抓页面表面时它们又都在——这组"表面有、屏幕无"的对照把原因锁定在合成层）。
    → 透明时给两个 chrome 加 `data-flat='true'`，CSS 里 `backdrop-filter: none`（`.spw-chrome-btn[data-flat='true']`、`.spw-player-bg[data-flat='true'] …`）。视觉上少一层模糊，可读性不受影响。
-3. **透明后窗口完全不可点 → 仍保留两条逃生通道**（v0.1.8 起页面已经可点，这两条退化为「万一页面崩溃/卡住」的保险）：
-   - **左下角控制 chip**：宿主创建 `TransparencyBadge : Form`（384×76，深色底 + 金色描边 + 金色开关 + `✕`，标题
-     「播放页透明背景」，提示「点开关或 Ctrl+Alt+B 恢复不透明」），`TopMost`、`ShowInTaskbar = false`、
-     `ShowWithoutActivation = true` + `WS_EX_NOACTIVATE`（不抢焦点，否则 ESC 会失效），`PlaceBottomLeft()` 贴在主屏
-     工作区左下 `(work.Left + 24, work.Bottom - Height - 24)`；点开关行 → `ExitTransparentMode("badge")`，
-     点 `✕` → 关窗。透明开启即显示，关闭即隐藏。日志 `transparency badge=shown at=x,y` / `badge=hidden`。
+3. **逃生通道：热键 + 页面开关本身**（v0.1.9 起不再有左下角 chip）
    - **全局热键（双向切换）**：`RegisterHotKey` 链 **Ctrl+Alt+B** → Ctrl+Alt+Y → Ctrl+Alt+P → Ctrl+Alt+Shift+B
-     （本机 Ctrl+Alt+T 已被别的程序占用，所以 B 优先）；v0.1.8 起只在启动时注册一次、不再注销，按一下在
-     「透明 ↔ 不透明」之间切换（`EnterTransparentMode` / `ExitTransparentMode`）；日志 `transparency hotkey=registered mods=0x3 vk=0x42` /
-     `transparency enter source=hotkey` / `transparency exit source=hotkey|badge` / `hotkey=failed`。
-   - 两条通道都走 `ExitTransparentMode(source)`：log → `SetTransparency(false)` → `ExecuteScriptAsync("window.__spwFoliaSetTransparent(false)")`。
-     后者由 `App.tsx` 注册到 `useSettingsStore`，于是页面开关同步回 off、再随 settings 回环持久化成 `false`。
+     （本机 Ctrl+Alt+T 已被别的程序占用，所以 B 优先）；启动时注册一次、不再注销，按一下在
+     「透明 ↔ 不透明」之间切换（`EnterTransparentMode` / `ExitTransparentMode`）；日志
+     `transparency hotkey=registered mods=0x3 vk=0x42` / `transparency enter source=hotkey` /
+     `transparency exit source=hotkey` / `hotkey=failed`。
+   - **页面里的两个开关**：右下角圆钮 → 面板里的「播放页透明背景」开关；有了热区转发，透明状态下它们
+     永远可点，所以不需要额外的浮标窗口（v0.1.7/v0.1.8 的 `TransparencyBadge` chip 已在 v0.1.9 删除）。
+   - 两条通道都走 `ExitTransparentMode(source)`：log → `SetTransparency(false)` →
+     `ExecuteScriptAsync("window.__spwFoliaSetTransparent(false)")`；页面开关随 settings 回环持久化成 `false`。
+     退出透明时宿主与页面都会把 `mousePassthrough` 复位为 `false`（`ApplyTransparencyFromSettings()` 里
+     `if (!on) passthrough = false;`，页面 `App.tsx` 里同样有 effect），避免下次进透明还在穿透态。
    - **状态机要点**：`transparencyActive`（窗口实际状态）与 `transparencyTarget`（页面开关的意图）必须
      分开且都由 `SetTransparency()` 收尾时对齐；`ApplyTransparencyFromSettings()` 只在
      `on != transparencyActive` 时才真正切窗口。早期版本用 `on == transparencyTarget` 提前 return，
-     导致「chip/热键退出后页面开关还亮着，再点开关无效」——v0.1.7 发布前已修。
+     导致「热键退出后页面开关还亮着，再点开关无效」——v0.1.7 发布前已修。
+
+## 4.4 v0.1.9：鼠标穿透开关与热区（hitbox）
+
+- 设置树新增 `mousePassthrough`（默认 `false`，与 `transparentPlayerBackground` 一起持久化）。
+  它只出现在透明开启后的面板里（第二行「鼠标穿透（操作桌面）」），关掉透明时会自动复位。
+- **页面 → 宿主**：`poc/settings-ui/src/bridge.ts` 的 `reportHitRegions()` 发送
+  `{"type":"hitbox","vw":innerWidth,"vh":innerHeight,"rects":[{x,y,w,h},…]}`；`App.tsx` 收集
+  `[data-spw-chrome="settings"]`（齿轮）、`[data-spw-chrome="player-background"]`（金色圆钮）、
+  `[data-spw-chrome="player-background-panel"][data-open="true"]`（面板）、
+  `[data-spw-settings-overlay="true"]`（设置整页），立即发一次 + 120 ms 后再发一次 + `resize` 监听，
+  chrome/面板/设置页状态变化时重发。
+- **宿主 → 判定**：`HostForm.UpdateHitRegions()` 存下 `vw/vh` 与 CSS 矩形；`IsInteractiveAt(screen)` 把屏幕点
+  换算成客户端点、再按 `ClientSize.Width / hitViewportWidth`（实测 3200/1776 = 1.802）换算成 CSS 坐标，
+  与每个矩形做 ±4 CSS px 容差命中（页面与宿主之间的亚像素/缩放误差都在容差内）。
+- **穿透过桌面**：`TransparencyInputCatcher.FallThrough` → `FallThroughToDesktop()`：隐藏捕获窗口 →
+  `mouse_event(LEFTDOWN|LEFTUP)`（真实输入，不是 `SendMessage`）→ `catcherRestoreAt = now + 220 ms` →
+  `OnTick` 到点再 `ShowInputCatcher()`；日志 `transparency passthrough=click at=x,y`，
+  开关状态日志 `transparency passthrough=on|off rects=N`。
+- **默认行为不变**：`mousePassthrough = false` 时 `IsInteractiveAt()` 直接返回 `true`，捕获窗口照旧整窗转发
+  （v0.1.8 的行为），只有打开穿透后热区之外才会落向桌面。
 
 透明时 chrome 常驻（`chromeAlwaysOn = transparentPlayerBackground === true`），并且 ESC 仍可关窗。
 
@@ -91,5 +114,8 @@ webView.DefaultBackgroundColor = Color.Black;
 - 键色是纯洋红 `rgb(255,0,255)`：页面若恰好绘制该像素会被挖空（当前 Folia 主题/歌词不会产生该纯色；属于可接受风险）。
 - 透明就是「透到桌面/其它窗口」，不是 OBS 浏览器的 alpha 源——OBS 场景请直接用 Folia 的浏览器源，或用窗口捕获。
 - 仅主屏全屏（与 v0.1.0 起一致）；多屏选择未实现。
-- 透明模式会捕获鼠标（v0.1.8 的输入捕获窗口）：想操作下层窗口需先切回不透明（Ctrl+Alt+B / chip / ESC 退出）。
+- 透明模式默认会捕获鼠标（v0.1.8 的输入捕获窗口）；要操作下层窗口请打开面板里的「鼠标穿透（操作桌面）」，
+  或按 Ctrl+Alt+B / ESC 退出透明。打开穿透后，只有两个浮标（右下角圆钮、右上角齿轮）、它们的面板/设置页
+  仍然可点，其余位置都落向桌面。
+- 穿透点击是「隐藏捕获窗口 → 合成一次左键 → 恢复」的时序（约 220 ms），极快连点时可能有一次丢失。
 - 透明模式下 `backdrop-filter` 视觉退化（见 §4.2），但控件可点（见 §4.1）。

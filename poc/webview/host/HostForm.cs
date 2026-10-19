@@ -10,7 +10,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
@@ -113,33 +112,26 @@ namespace SpwFolia
         private static readonly uint[] HotkeyMods = { ModControl | ModAlt, ModControl | ModAlt, ModControl | ModAlt, ModControl | ModAlt | 0x0004 };
         private static readonly uint[] HotkeyVks = { 0x42 /* B */, 0x59 /* Y */, 0x50 /* P */, 0x42 /* B */ };
         private bool transparencyHotkeyRegistered;
-        private const int WH_MOUSE_LL = 14;
-        private const int VK_LBUTTON = 0x01;
-        private const int MK_LBUTTON = 0x0001;
-        private const int WM_MOUSEMOVE = 0x0200;
-        private const int WM_LBUTTONDOWN = 0x0201;
-        private const int WM_LBUTTONUP = 0x0202;
-        private const int WM_RBUTTONDOWN = 0x0204;
-        private const int WM_RBUTTONUP = 0x0205;
-        private const int WM_MOUSEWHEEL = 0x020A;
-
-        // v0.1.7b: besides the hotkey, a separate always-on-top badge window offers a mouse way back.
-        // It is NOT layered, so it receives clicks even while the player window is click-through.
-        private TransparencyBadge transparencyBadge;
+        // v0.1.9: "鼠标穿透" — while the player background is transparent the page may ask the host to
+        // let clicks fall through to the desktop. The two chrome floats (bottom-right round button and
+        // top-right gear) stay clickable: the page reports their rectangles and only those forward.
+        private bool mousePassthrough;
+        private double hitViewportWidth;
+        private double hitViewportHeight;
+        private readonly List<RectangleF> hitRegionsCss = new List<RectangleF>();
+        private long catcherRestoreAt = -1;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-        private static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool UnhookWindowsHookEx(IntPtr hhk);
+        private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+        private const uint MouseEventLeftDown = 0x0002;
+        private const uint MouseEventLeftUp = 0x0004;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern IntPtr PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
@@ -161,8 +153,6 @@ namespace SpwFolia
 
         [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetClassName(IntPtr hWnd, StringBuilder name, int max);
-
-        private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
         private delegate bool EnumChildProc(IntPtr hWnd, IntPtr lParam);
 
@@ -267,6 +257,26 @@ namespace SpwFolia
                 catch (Exception ex) { log.Error("transparency-parse", ex); }
             }
             if (args.NoTransparency) on = false;
+            bool passthrough = false;
+            if (!string.IsNullOrEmpty(settingsRaw))
+            {
+                try
+                {
+                    string passRaw = JsonUtil.ExtractRawValue(settingsRaw, "mousePassthrough");
+                    passthrough = passRaw != null && passRaw.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+                catch (Exception ex) { log.Error("passthrough-parse", ex); }
+            }
+            if (args.NoTransparency) passthrough = false;
+            // v0.1.9: passthrough only exists inside a transparent session — leaving transparency
+            // always releases the mouse so the next opaque session starts fully clickable.
+            if (!on) passthrough = false;
+            if (passthrough != mousePassthrough)
+            {
+                mousePassthrough = passthrough;
+                log.Log("info", "transparency passthrough=" + (passthrough ? "on" : "off")
+                    + " rects=" + hitRegionsCss.Count);
+            }
             // Keep the target in sync with the page even when the window is already in that mode:
             // exiting via the badge/hotkey leaves the page switch on, so the next "on" must re-apply.
             transparencyTarget = on;
@@ -297,8 +307,6 @@ namespace SpwFolia
                 transparencyActive = on;
                 transparencyTarget = on;
                 EnsureTransparencyHotkey();
-                if (on) ShowTransparencyBadge();
-                else HideTransparencyBadge();
                 if (on) ShowInputCatcher();
                 else HideInputCatcher();
                 log.Log("info", "transparency mode=" + (on ? "on" : "off"));
@@ -364,51 +372,6 @@ namespace SpwFolia
             SyncPageTransparency(false);
         }
 
-        private void ShowTransparencyBadge()
-        {
-            try
-            {
-                if (transparencyBadge == null)
-                {
-                    transparencyBadge = new TransparencyBadge();
-                    transparencyBadge.RestoreRequested += OnBadgeRestoreRequested;
-                    transparencyBadge.CloseRequested += OnBadgeCloseRequested;
-                }
-                transparencyBadge.PlaceBottomLeft();
-                if (!transparencyBadge.Visible) transparencyBadge.Show();
-                transparencyBadge.BringToFront();
-                log.Log("info", "transparency badge=shown at="
-                    + transparencyBadge.Location.X + "," + transparencyBadge.Location.Y);
-            }
-            catch (Exception ex) { log.Error("transparency-badge", ex); }
-        }
-
-        private void HideTransparencyBadge()
-        {
-            try
-            {
-                if (transparencyBadge != null && transparencyBadge.Visible)
-                {
-                    transparencyBadge.Hide();
-                    log.Log("info", "transparency badge=hidden");
-                }
-            }
-            catch (Exception ex) { log.Error("transparency-badge", ex); }
-        }
-
-        private void OnBadgeRestoreRequested(object sender, EventArgs e)
-        {
-            try { SafeBeginInvoke(delegate { ExitTransparentMode("badge"); }); }
-            catch (Exception ex) { log.Error("transparency-badge", ex); }
-        }
-
-        private void OnBadgeCloseRequested(object sender, EventArgs e)
-        {
-            log.Log("info", "transparency badge=close requested");
-            try { SafeBeginInvoke(delegate { CloseWith("user", 0); }); }
-            catch (Exception ex) { log.Error("transparency-badge", ex); }
-        }
-
         // ------------------------------------------------------------ v0.1.8b: click-through fix
 
         // A colour-key layered window is click-through for the whole client area, so real mouse input
@@ -427,7 +390,12 @@ namespace SpwFolia
         {
             try
             {
-                if (inputCatcher == null) inputCatcher = new TransparencyInputCatcher(TargetInputHandle);
+                if (inputCatcher == null)
+                {
+                    inputCatcher = new TransparencyInputCatcher(TargetInputHandle);
+                    inputCatcher.ShouldForward = IsInteractiveAt;
+                    inputCatcher.FallThrough = FallThroughToDesktop;
+                }
                 ApplyInputCatcherBounds();
                 if (transparencyActive && inputCatcher != null && inputCatcher.Visible)
                 {
@@ -435,8 +403,7 @@ namespace SpwFolia
                     log.Log("info", "transparency mouse=catcher raised bounds=" + inputCatcher.Bounds);
                 }
                 if (!inputCatcher.Visible) inputCatcher.Show();
-                // keep the chip (opaque, clickable) above the catcher
-                if (transparencyBadge != null && transparencyBadge.Visible) transparencyBadge.BringToFront();
+
                 log.Log("info", "transparency mouse=catcher shown bounds=" + inputCatcher.Bounds);
             }
             catch (Exception ex) { log.Error("transparency-mouse", ex); }
@@ -507,6 +474,86 @@ namespace SpwFolia
             return found;
         }
 
+        // ------------------------------------------------------------ v0.1.9: desktop mouse passthrough
+
+        /// <summary>
+        /// The page reports its interactive chrome rectangles in CSS pixels: the bottom-right round
+        /// button, the top-right gear, the open player panel and the full-screen settings overlay.
+        /// While "鼠标穿透" is on only those rectangles keep receiving clicks; every other press is
+        /// replayed onto whatever window sits below the transparent player window.
+        /// </summary>
+        private void UpdateHitRegions(Dictionary<string, object> msg)
+        {
+            try
+            {
+                double vw = JsonUtil.GetDouble(msg, "vw", 0);
+                double vh = JsonUtil.GetDouble(msg, "vh", 0);
+                List<RectangleF> next = new List<RectangleF>();
+                object rectsObject;
+                if (msg.TryGetValue("rects", out rectsObject))
+                {
+                    object[] rects = rectsObject as object[];
+                    if (rects != null)
+                    {
+                        for (int i = 0; i < rects.Length; i++)
+                        {
+                            Dictionary<string, object> item = rects[i] as Dictionary<string, object>;
+                            if (item == null) continue;
+                            float x = (float)JsonUtil.GetDouble(item, "x", 0);
+                            float y = (float)JsonUtil.GetDouble(item, "y", 0);
+                            float w = (float)JsonUtil.GetDouble(item, "w", 0);
+                            float h = (float)JsonUtil.GetDouble(item, "h", 0);
+                            if (w > 1 && h > 1) next.Add(new RectangleF(x, y, w, h));
+                        }
+                    }
+                }
+                hitViewportWidth = vw;
+                hitViewportHeight = vh;
+                hitRegionsCss.Clear();
+                hitRegionsCss.AddRange(next);
+            }
+            catch (Exception ex) { log.Error("hitbox", ex); }
+        }
+
+        /// <summary>True when the page may take this screen point (chrome floats / panel / overlay).</summary>
+        private bool IsInteractiveAt(Point screen)
+        {
+            if (!mousePassthrough) return true;
+            if (hitRegionsCss.Count == 0 || hitViewportWidth <= 0 || hitViewportHeight <= 0) return true;
+            try
+            {
+                Point client = PointToClient(screen);
+                double scaleX = ClientSize.Width / hitViewportWidth;
+                double scaleY = ClientSize.Height / hitViewportHeight;
+                if (scaleX <= 0 || scaleY <= 0) return true;
+                double cssX = client.X / scaleX;
+                double cssY = client.Y / scaleY;
+                for (int i = 0; i < hitRegionsCss.Count; i++)
+                {
+                    RectangleF r = hitRegionsCss[i];
+                    if (cssX >= r.Left - 4 && cssX <= r.Right + 4 && cssY >= r.Top - 4 && cssY <= r.Bottom + 4) return true;
+                }
+            }
+            catch (Exception ex) { log.Error("hitbox-hit", ex); return true; }
+            return false;
+        }
+
+        /// <summary>
+        /// The catcher swallowed a press the page does not want. Hide it, replay a real click so the
+        /// window underneath gets both the down and the up, then put the catcher back shortly after.
+        /// </summary>
+        private void FallThroughToDesktop(Point screen)
+        {
+            try
+            {
+                HideInputCatcher();
+                mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
+                mouse_event(MouseEventLeftUp, 0, 0, 0, UIntPtr.Zero);
+                catcherRestoreAt = clock.ElapsedMilliseconds + 220;
+                log.Log("info", "transparency passthrough=click at=" + screen.X + "," + screen.Y);
+            }
+            catch (Exception ex) { log.Error("passthrough", ex); }
+        }
         private void SyncPageTransparency(bool on)
         {
             try
@@ -617,6 +664,12 @@ namespace SpwFolia
                     SetCursorVisible(true);
                     return;
                 }
+                if (transparencyActive && mousePassthrough)
+                {
+                    // operating the desktop underneath needs a visible pointer all the time
+                    SetCursorVisible(true);
+                    return;
+                }
                 Point pos = Cursor.Position;
                 long now = clock.ElapsedMilliseconds;
                 if (lastCursorMoveAt < 0 || pos != cursorPos)
@@ -706,8 +759,7 @@ namespace SpwFolia
                 transparencyHotkeyRegistered = false;
             }
             DisposeInputCatcher();
-            try { if (transparencyBadge != null) { transparencyBadge.Dispose(); transparencyBadge = null; } }
-            catch (Exception) { }
+
             SendClosed();
             log.Log("info", "host-exit code=" + exitCode + " reason=" + closeReason
                 + " framesPosted=" + totalFramesPosted
@@ -931,6 +983,10 @@ namespace SpwFolia
                     log.WriteLine("{\"t\":\"settings\",\"settings\":" + settingsValue + "}");
                 }
             }
+            else if (type == "hitbox")
+            {
+                UpdateHitRegions(msg);
+            }
             else if (type == "action")
             {
                 string name = JsonUtil.GetString(msg, "name");
@@ -987,6 +1043,11 @@ namespace SpwFolia
         private void OnTick(object sender, EventArgs e)
         {
             SyncInputCatcherBounds();
+            if (catcherRestoreAt >= 0 && clock.ElapsedMilliseconds >= catcherRestoreAt)
+            {
+                catcherRestoreAt = -1;
+                if (transparencyActive) ShowInputCatcher();
+            }
             TrackCursor();
             long now = clock.ElapsedMilliseconds;
             long elapsed = now - lastTick;
@@ -1629,155 +1690,6 @@ namespace SpwFolia
 // v0.1.7b: player-page transparency escape hatch
 // ---------------------------------------------------------------------------
 
-/// <summary>
-/// A small always-on-top control chip shown while the player background is transparent. The player
-/// window is colour-key layered and consequently click-through, so this plain (non-layered,
-/// never-activated) window carries the controls the page can no longer receive:
-///  - a switch that looks like the settings row's toggle and turns the transparency back off,
-///  - a close button that ends playback,
-///  - the hint naming the global hotkey.
-/// v0.1.8: it is a real chip instead of a single text badge because users kept trying to click the
-/// page's own switch while the page was display-only.
-/// </summary>
-internal sealed class TransparencyBadge : Form
-{
-    private const string ChipTitle = "播放页透明背景";
-    private const string ChipHint = "点开关或 Ctrl+Alt+B 恢复不透明";
-    private static readonly Color ChipBack = Color.FromArgb(24, 21, 18);
-    private static readonly Color ChipBorder = Color.FromArgb(214, 168, 84);
-    private static readonly Color ChipText = Color.FromArgb(238, 231, 220);
-    private static readonly Color ChipMuted = Color.FromArgb(150, 143, 133);
-    private static readonly Color SwitchOn = Color.FromArgb(216, 176, 114);
-
-    private readonly Rectangle switchRect = new Rectangle(16, 14, 40, 22);
-    private readonly Rectangle titleRect = new Rectangle(66, 11, 260, 26);
-    private readonly Rectangle closeRect = new Rectangle(346, 12, 26, 26);
-    private bool closeHot;
-
-    public event EventHandler RestoreRequested;
-    public event EventHandler CloseRequested;
-
-    public TransparencyBadge()
-    {
-        FormBorderStyle = FormBorderStyle.None;
-        StartPosition = FormStartPosition.Manual;
-        ShowInTaskbar = false;
-        TopMost = true;
-        AutoScaleMode = AutoScaleMode.None;
-        BackColor = ChipBack;
-        Cursor = Cursors.Hand;
-        ClientSize = new Size(384, 76);
-        DoubleBuffered = true;
-        MouseMove += OnChipMouseMove;
-        MouseDown += OnChipMouseDown;
-        Paint += OnChipPaint;
-    }
-
-    // Never take activation away from the player: ESC must keep reaching the player window.
-    protected override bool ShowWithoutActivation { get { return true; } }
-
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            CreateParams cp = base.CreateParams;
-            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE
-            return cp;
-        }
-    }
-
-    public void PlaceBottomLeft()
-    {
-        Screen screen = Screen.PrimaryScreen;
-        Rectangle work = screen != null ? screen.WorkingArea : new Rectangle(0, 0, 1280, 720);
-        Location = new Point(work.Left + 24, work.Bottom - Height - 24);
-    }
-
-    private void OnChipMouseMove(object sender, MouseEventArgs e)
-    {
-        bool hot = closeRect.Contains(e.Location);
-        if (hot == closeHot) return;
-        closeHot = hot;
-        Cursor = hot ? Cursors.Hand : Cursors.Default;
-        Invalidate(closeRect);
-    }
-
-    private void OnChipMouseDown(object sender, MouseEventArgs e)
-    {
-        if (e.Button != MouseButtons.Left) return;
-        if (closeRect.Contains(e.Location))
-        {
-            EventHandler closeHandler = CloseRequested;
-            if (closeHandler != null) closeHandler(this, EventArgs.Empty);
-            return;
-        }
-        // The whole switch row is the target: the chip has to be easy to hit on a 4K screen.
-        Rectangle row = new Rectangle(8, 6, 330, 38);
-        if (!row.Contains(e.Location)) return;
-        EventHandler restoreHandler = RestoreRequested;
-        if (restoreHandler != null) restoreHandler(this, EventArgs.Empty);
-    }
-
-    private void OnChipPaint(object sender, PaintEventArgs e)
-    {
-        Graphics g = e.Graphics;
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        using (SolidBrush back = new SolidBrush(ChipBack)) g.FillRectangle(back, ClientRectangle);
-        using (Pen border = new Pen(ChipBorder, 1f)) g.DrawRectangle(border, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
-
-        // Switch (on): gold track + white knob on the right, same look as the in-page toggle.
-        using (GraphicsPath path = RoundedRect(switchRect, 11))
-        using (SolidBrush track = new SolidBrush(SwitchOn)) g.FillPath(track, path);
-        Rectangle knob = new Rectangle(switchRect.Right - 19, switchRect.Top + 2, 18, 18);
-        using (SolidBrush fill = new SolidBrush(Color.White)) g.FillEllipse(fill, knob);
-
-        TextRenderer.DrawText(g, ChipTitle, Font, titleRect, ChipText,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-
-        // Close (ends playback; the page cannot be clicked in this mode).
-        using (Pen pen = new Pen(closeHot ? Color.FromArgb(255, 214, 140) : ChipMuted, 1.6f))
-        {
-            int pad = 8;
-            g.DrawLine(pen, closeRect.Left + pad, closeRect.Top + pad, closeRect.Right - pad, closeRect.Bottom - pad);
-            g.DrawLine(pen, closeRect.Right - pad, closeRect.Top + pad, closeRect.Left + pad, closeRect.Bottom - pad);
-        }
-
-        TextRenderer.DrawText(g, ChipHint, hintFont, new Rectangle(16, 50, 352, 20), ChipMuted,
-            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-    }
-
-    private Font hintFont;
-
-    protected override void OnHandleCreated(EventArgs e)
-    {
-        base.OnHandleCreated(e);
-        Font = new Font("Microsoft YaHei UI", 10f, FontStyle.Regular);
-        hintFont = new Font("Microsoft YaHei UI", 8.5f, FontStyle.Regular);
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing && hintFont != null)
-        {
-            hintFont.Dispose();
-            hintFont = null;
-        }
-        base.Dispose(disposing);
-    }
-
-    private static GraphicsPath RoundedRect(Rectangle rect, int radius)
-    {
-        GraphicsPath path = new GraphicsPath();
-        int d = radius * 2;
-        path.AddArc(rect.Left, rect.Top, d, d, 180, 90);
-        path.AddArc(rect.Right - d, rect.Top, d, d, 270, 90);
-        path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
-        path.AddArc(rect.Left, rect.Bottom - d, d, d, 90, 90);
-        path.CloseFigure();
-        return path;
-    }
-}
-
     /// <summary>
     /// v0.1.8b: invisible (alpha 1/255) layered window that covers the transparent player window. It is
     /// NOT colour-keyed, so it still receives mouse input, and forwards every event into the WebView2
@@ -1815,6 +1727,12 @@ internal sealed class TransparencyBadge : Form
 
         private readonly Func<IntPtr> target;
         private int forwarded;
+
+        /// <summary>Decides whether an event may reach the page; false lets the desktop have it.</summary>
+        public Func<Point, bool> ShouldForward;
+
+        /// <summary>Called for a press that should reach the desktop instead (v0.1.9 passthrough).</summary>
+        public Action<Point> FallThrough;
 
         public TransparencyInputCatcher(Func<IntPtr> inputHandle)
         {
@@ -1862,31 +1780,48 @@ internal sealed class TransparencyBadge : Form
             int msg = m.Msg;
             if (msg != WM_MOUSEMOVE && msg != WM_LBUTTONDOWN && msg != WM_LBUTTONUP
                 && msg != WM_RBUTTONDOWN && msg != WM_RBUTTONUP && msg != WM_MOUSEWHEEL) return false;
-            IntPtr targetHandle = target();
-            if (targetHandle == IntPtr.Zero) return false;
             NativePoint pt = new NativePoint();
+            int delta = 0;
             if (msg == WM_MOUSEWHEEL)
             {
                 int wp = m.WParam.ToInt32();
                 pt.X = (short)(wp & 0xFFFF);
                 pt.Y = (short)((wp >> 16) & 0xFFFF);
+                delta = (short)((m.LParam.ToInt32() >> 16) & 0xFFFF);
+            }
+            else
+            {
+                int lp = m.LParam.ToInt32();
+                pt.X = (short)(lp & 0xFFFF);
+                pt.Y = (short)((lp >> 16) & 0xFFFF);
+                Point screen = PointToScreen(new Point(pt.X, pt.Y));
+                pt.X = screen.X;
+                pt.Y = screen.Y;
+            }
+            Func<Point, bool> allow = ShouldForward;
+            if (allow != null && !allow(new Point(pt.X, pt.Y)))
+            {
+                // v0.1.9: "鼠标穿透" — this press belongs to the desktop, not to the page.
+                if (msg == WM_LBUTTONDOWN)
+                {
+                    Action<Point> fall = FallThrough;
+                    if (fall != null) fall(new Point(pt.X, pt.Y));
+                }
+                return true;
+            }
+            IntPtr targetHandle = target();
+            if (targetHandle == IntPtr.Zero) return false;
+            if (msg == WM_MOUSEWHEEL)
+            {
                 ScreenToClient(targetHandle, ref pt);
-                int delta = (short)((m.LParam.ToInt32() >> 16) & 0xFFFF);
                 IntPtr wheelWParam = (IntPtr)((delta << 16) & unchecked((int)0xFFFF0000));
                 SendMessage(targetHandle, (uint)msg, wheelWParam, MakeLParam(pt.X, pt.Y));
                 return true;
             }
-            int lp = m.LParam.ToInt32();
-            pt.X = (short)(lp & 0xFFFF);
-            pt.Y = (short)((lp >> 16) & 0xFFFF);
-            Point screen = PointToScreen(new Point(pt.X, pt.Y));
-            pt.X = screen.X;
-            pt.Y = screen.Y;
             ScreenToClient(targetHandle, ref pt);
             SendMessage(targetHandle, (uint)msg, m.WParam, MakeLParam(pt.X, pt.Y));
             return true;
         }
-
         private static IntPtr MakeLParam(int x, int y)
         {
             return (IntPtr)((y << 16) | (x & 0xFFFF));

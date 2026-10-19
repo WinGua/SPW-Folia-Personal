@@ -307,4 +307,43 @@ export const setSettingsUiOpenState = (open: boolean): void => {
 };
 const isSettingsUiOpen = (): boolean => openState;
 
+/** Posts a raw message to the host (no shim echo). Returns false when the page is not hosted. */
+export const postHostMessage = (message: unknown): boolean => {
+    const post = (window as unknown as {
+        chrome?: { webview?: { postMessage: (message: unknown) => void } };
+    }).chrome?.webview?.postMessage;
+    if (typeof post !== 'function') return false;
+    try {
+        post(message);
+        return true;
+    } catch (error) {
+        console.warn('[spw-folia] failed to post host message', error);
+        return false;
+    }
+};
+
+/**
+ * v0.1.9: reports the interactive chrome rectangles (CSS px, page viewport) so the host can keep them
+ * clickable while the transparent player window is in mouse-passthrough mode. Everything else falls
+ * through to the desktop.
+ */
+export interface HitRegion {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+export const reportHitRegions = (regions: HitRegion[]): void => {
+    const viewportWidth = window.innerWidth || 0;
+    const viewportHeight = window.innerHeight || 0;
+    if (viewportWidth <= 0 || viewportHeight <= 0) return;
+    postHostMessage({
+        type: 'hitbox',
+        vw: viewportWidth,
+        vh: viewportHeight,
+        rects: regions,
+    });
+};
+
 export { DEMO_THEME };

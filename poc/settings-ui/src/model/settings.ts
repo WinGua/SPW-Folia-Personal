@@ -186,6 +186,11 @@ interface SettingsState {
     transparentPlayerBackground: boolean;
     setTransparentPlayerBackground: (value: boolean) => void;
 
+    /** v0.1.9: while the player background is transparent, let the mouse fall through to the desktop
+     *  (the bottom-right round button and the top-right gear stay clickable). */
+    mousePassthrough: boolean;
+    setMousePassthrough: (value: boolean) => void;
+
     backgroundMode: BackgroundMode;
     setBackgroundMode: (mode: BackgroundMode) => void;
     backgroundTunings: Record<'monet' | 'nomand' | 'latent' | 'sora', Record<string, unknown>>;
@@ -250,6 +255,9 @@ export const useSettingsStore = create<SettingsState>(set => ({
     transparentPlayerBackground: false,
     setTransparentPlayerBackground: transparentPlayerBackground => set({ transparentPlayerBackground }),
 
+    mousePassthrough: false,
+    setMousePassthrough: mousePassthrough => set({ mousePassthrough }),
+
     backgroundMode: 'latent',
     setBackgroundMode: backgroundMode => set({ backgroundMode }),
     backgroundTunings: JSON.parse(JSON.stringify(BACKGROUND_TUNING_DEFAULTS)),
@@ -302,6 +310,7 @@ export interface SettingsSnapshot {
     lyricMotion: number;
     textureResolution: number;
     transparentPlayerBackground: boolean;
+    mousePassthrough: boolean;
 }
 
 export const snapshotFromState = (state: SettingsState): SettingsSnapshot => ({
@@ -318,6 +327,7 @@ export const snapshotFromState = (state: SettingsState): SettingsSnapshot => ({
     lyricMotion: state.lyricMotion,
     textureResolution: state.textureResolution,
     transparentPlayerBackground: state.transparentPlayerBackground,
+    mousePassthrough: state.mousePassthrough,
 });
 
 /** Hydrates the store from a snapshot the plugin persisted (unknown/missing keys keep defaults). */
@@ -337,6 +347,7 @@ export const applySnapshot = (snapshot: Partial<SettingsSnapshot> | null | undef
         lyricMotion: clean(snapshot.lyricMotion, state.lyricMotion),
         textureResolution: clean(snapshot.textureResolution, state.textureResolution),
         transparentPlayerBackground: clean(snapshot.transparentPlayerBackground, state.transparentPlayerBackground),
+        mousePassthrough: clean(snapshot.mousePassthrough, state.mousePassthrough),
     }));
 };
 

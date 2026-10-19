@@ -32,9 +32,10 @@
 - **设置页实时大预览**（v0.1.6）— 「歌词样式」左侧大预览不是静态截图，而是同源 iframe 里的
   真实 Folia 渲染器逐帧绘制：样式、纹理分辨率、镜头运动、字体、背景、主题改动即时生效，
   暂停/播放按钮真正冻结和恢复画面。
-- **播放页透明背景**（v0.1.7，v0.1.8 起透明时控件仍可点）— 全屏播放页右下角的圆形「调音台」按钮里可开关「播放页透明背景」：
-  开启后宿主窗口变成真正的透明窗口，Folia 不再绘制背景，歌词与特效直接叠加在桌面或其它窗口之上
-  （直播 / OBS 叠加场景）。开关随设置树持久化。
+- **播放页透明背景**（v0.1.7，v0.1.9 起可切换鼠标穿透）— 全屏播放页右下角的圆形「调音台」按钮里可开关
+  「播放页透明背景」：开启后宿主窗口变成真正的透明窗口，Folia 不再绘制背景，歌词与特效直接叠加在桌面或
+  其它窗口之上（直播 / OBS 叠加场景）。面板第二行「鼠标穿透（操作桌面）」打开后，点击落向桌面/其它应用，
+  而右下角圆钮与右上角齿轮在任何状态下都保持可点。开关随设置树持久化。
 - **封面取色** — 主题、背景与强调色由当前歌曲封面派生（v0.1.2 修复），随封面切换实时变化。
 - **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自
   SPW 播放 API 加一条平滑插值时间轴。
@@ -57,9 +58,22 @@
 - **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆
   变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
 - 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
-- **透明模式会捕获鼠标**（v0.1.8 起页面控件可点，见下）：透明窗口整页盖在桌面上，点哪里都先给
-  Folia；要操作桌面或其它窗口，先按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B）、
-  点左下角 chip 的开关，或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
+- **透明模式默认会捕获鼠标**：透明窗口整页盖在桌面上，点哪里都先给 Folia（v0.1.8 起页面控件可点）。
+  想在透明状态下操作桌面/其它窗口，打开面板里的「**鼠标穿透（操作桌面）**」即可；右下角圆钮与右上角
+  齿轮（以及它们打开的面板/设置页）永远可点。也可以按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P /
+  Ctrl+Alt+Shift+B）或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
+
+## v0.1.9 更新内容
+
+- **面板新增「鼠标穿透（操作桌面）」** — 右下角金色圆钮打开的面板里，第二行就是穿透开关（只有透明背景
+  开启时出现）。默认关闭：透明窗口仍可点页面（v0.1.8 行为）；打开后点击落向桌面/其它窗口，
+  而右下角圆钮、右上角齿轮、它们打开的面板与设置整页仍然可点。
+- **两个浮标永远可点** — 页面把自己的热区（圆钮、齿轮、打开中的面板、设置整页）报给宿主，透明窗口上的
+  不可见输入捕获窗口只在热区内转发鼠标；热区之外（穿透开启时）改为「合成一次真实左键 → 220 ms 后恢复」，
+  所以同一个透明窗口既能点 Folia 又能点桌面。
+- **删除左下角 chip** — v0.1.7/v0.1.8 的「恢复不透明背景」浮标窗口已移除，画面不再被额外窗口遮挡；
+  **Ctrl+Alt+B** 双向切换保留，退出透明时 `mousePassthrough` 自动复位，下次进入透明不会停留在穿透态。
+- 机制见 [docs/live-transparency.md](docs/live-transparency.md)，验证见 [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md)。
 
 ## v0.1.8 更新内容
 
@@ -172,6 +186,7 @@
 | v0.1.6：设置页大预览 = iframe 内真实 Folia 渲染器（3 canvas、暂停帧差 0.00000、切样式即时生效、5 轮开合复用同一 iframe、0 页面错误） | [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) |
 | v0.1.7：播放页透明背景（色键窗口真透明、桌面透出、左下浮标/ Ctrl+Alt+B 恢复不透明并同步页面开关、退出后再次开启正常、设置树持久化、ESC 退出、透明时 chrome 可见） | [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md) |
 | v0.1.8：切歌即换词（track/lyrics 相差 2 ms）、封面 0.2 s 缩图并 0.4 s 内到页面、无封面保留旧主题；透明窗口内鼠标可点（透明中点开关 → `mode=off` + catcher 隐藏） | [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md) |
+| v0.1.9：鼠标穿透开关（`passthrough=on rects=3` → 点桌面 `passthrough=click at=1600,560` → catcher 恢复）、穿透下圆钮/齿轮/设置页返回键可点、热键退出后 `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -182,7 +197,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.8.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.9.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -199,7 +214,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.8.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.9.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -212,8 +227,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.8.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.8.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.9.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.9.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

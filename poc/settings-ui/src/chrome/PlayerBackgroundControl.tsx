@@ -17,6 +17,11 @@ interface PlayerBackgroundControlProps {
     onToggle: (next: boolean) => void;
     label: string;
     hint: string;
+    /** v0.1.9: while transparent, let the mouse reach the desktop instead of the page. */
+    passthrough: boolean;
+    onTogglePassthrough: (next: boolean) => void;
+    passthroughLabel: string;
+    passthroughHint: string;
 }
 
 const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
@@ -27,6 +32,10 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
     onToggle,
     label,
     hint,
+    passthrough,
+    onTogglePassthrough,
+    passthroughLabel,
+    passthroughHint,
 }) => {
     const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,7 +56,13 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
 
     return (
         <div className="spw-player-bg" ref={rootRef} data-flat={enabled ? 'true' : 'false'}>
-            <div className="spw-player-bg-panel" data-open={open ? 'true' : 'false'} role="group" aria-label={label}>
+            <div
+                className="spw-player-bg-panel"
+                data-spw-chrome="player-background-panel"
+                data-open={open ? 'true' : 'false'}
+                role="group"
+                aria-label={label}
+            >
                 <button
                     type="button"
                     className="spw-player-bg-row"
@@ -64,8 +79,27 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
                     </span>
                 </button>
                 {enabled ? (
+                    <button
+                        type="button"
+                        className="spw-player-bg-row spw-player-bg-row--second"
+                        role="switch"
+                        aria-checked={passthrough ? 'true' : 'false'}
+                        onClick={() => onTogglePassthrough(!passthrough)}
+                    >
+                        <span className="spw-player-bg-text">
+                            <span className="spw-player-bg-label">{passthroughLabel}</span>
+                            <span className="spw-player-bg-hint">{passthroughHint}</span>
+                        </span>
+                        <span className="spw-switch" data-on={passthrough ? 'true' : 'false'} aria-hidden="true">
+                            <span className="spw-switch-knob" />
+                        </span>
+                    </button>
+                ) : null}
+                {enabled ? (
                     <p className="spw-player-bg-note">
-                        透明窗口内控件仍可点击；Ctrl+Alt+B 或左下角开关可随时切回不透明，ESC 退出播放。
+                        {passthrough
+                            ? '鼠标正落向桌面：右下角圆钮与右上角齿轮始终可点；关掉「鼠标穿透」即可操作页面。'
+                            : '透明窗口内页面可正常点击；打开「鼠标穿透」可直接操作桌面。ESC 退出播放。'}
                     </p>
                 ) : null}
             </div>

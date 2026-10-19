@@ -31,8 +31,10 @@ import {
 } from '~/model/theme';
 import {
     registerSettingsUiController,
+    reportHitRegions,
     setSettingsUiOpenState,
     subscribeSettingsRoundTrip,
+    type HitRegion,
 } from '~/bridge';
 import PlayerBackgroundControl from '~/chrome/PlayerBackgroundControl';
 import { useConfigPublisher } from '~/useConfigPublisher';
@@ -71,6 +73,14 @@ const App: React.FC<AppProps> = ({ injected }) => {
         };
     }, []);
 
+    /* v0.1.9: "mouse passthrough" only exists inside a transparent session. Leaving transparency
+     * always releases the mouse, so the next opaque session starts with every control clickable. */
+    useEffect(() => {
+        if (!state.transparentPlayerBackground && state.mousePassthrough) {
+            state.setMousePassthrough(false);
+        }
+    }, [state.transparentPlayerBackground, state.mousePassthrough]);
+
     // Folia's settings window tints all of its text from the global --text-primary the app shell
     // sets from the current theme; the injected bundle owns that variable for the overlay subtree.
     useEffect(() => {
@@ -99,6 +109,32 @@ const App: React.FC<AppProps> = ({ injected }) => {
     useEffect(() => {
         if (open) setPlayerPanelOpen(false);
     }, [open]);
+    /* v0.1.9: the host can put the transparent player window into mouse-passthrough mode, where every
+     * click falls through to the desktop except over the chrome. Report those rectangles (CSS px) so the
+     * bottom-right round button and the top-right gear stay clickable at all times. */
+    useEffect(() => {
+        const collect = () => {
+            const rects: HitRegion[] = [];
+            const push = (el: Element | null) => {
+                if (!(el instanceof HTMLElement)) return;
+                const rect = el.getBoundingClientRect();
+                if (rect.width < 2 || rect.height < 2) return;
+                rects.push({ x: rect.left, y: rect.top, w: rect.width, h: rect.height });
+            };
+            push(document.querySelector('[data-spw-chrome="settings"]'));
+            push(document.querySelector('[data-spw-chrome="player-background"]'));
+            push(document.querySelector('[data-spw-chrome="player-background-panel"][data-open="true"]'));
+            push(document.querySelector('[data-spw-settings-overlay="true"]'));
+            reportHitRegions(rects);
+        };
+        collect();
+        const settle = window.setTimeout(collect, 120);
+        window.addEventListener('resize', collect);
+        return () => {
+            window.clearTimeout(settle);
+            window.removeEventListener('resize', collect);
+        };
+    }, [state.transparentPlayerBackground, state.mousePassthrough, playerPanelOpen, open, chromeVisible]);
 
     // v0.1.7: while the player-background panel is open it owns ESC (panel first, window second) —
     // window-capture + stopPropagation keeps both our settings listener and the host's Escape out.
@@ -194,6 +230,10 @@ const App: React.FC<AppProps> = ({ injected }) => {
                 onToggle={value => state.setTransparentPlayerBackground(value)}
                 label={t('options.transparentPlayerBackground')}
                 hint={t('options.transparentPlayerBackgroundDesc')}
+                passthrough={state.mousePassthrough}
+                onTogglePassthrough={value => state.setMousePassthrough(value)}
+                passthroughLabel="鼠标穿透（操作桌面）"
+                passthroughHint="开启后点击落到桌面，两个浮标仍可点"
             />
             <button
                 type="button"
@@ -211,6 +251,7 @@ const App: React.FC<AppProps> = ({ injected }) => {
             </button>
             <div
                 className="font-sans"
+                data-spw-settings-overlay={open ? 'true' : 'false'}
                 style={{
                     position: 'fixed',
                     inset: 0,

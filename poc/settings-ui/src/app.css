@@ -227,6 +227,13 @@ body.spw-injected {
     outline-offset: 2px;
 }
 
+/* v0.1.9: the second switch in the panel (mouse passthrough) reads as its own row. */
+.spw-player-bg-row--second {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 12px 12px;
+    padding-top: 13px;
+}
+
 .spw-player-bg-text {
     display: flex;
     flex-direction: column;
