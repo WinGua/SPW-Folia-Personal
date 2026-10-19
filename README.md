@@ -17,6 +17,7 @@
 
 ## 功能
 
+- **模组管理作者名**：`azkbzxf`（GitHub 账号，v0.1.3 起）。
 - **直接运行真正的 Folia，而非移植** — 插件在 WebView2 中承载 Folia 0.7.21 的生产级
   OBS 浏览器源产物；每种样式都是 Folia 原始代码，因此动态、辉光、逐字时间轴、背景与转场都与
   Folia 像素级一致。
@@ -41,13 +42,26 @@
 - **智能动感的节拍特效未包含在 v1**：Folia OBS 接口不暴露节拍事件，而 Folia 的
   节拍模型（`beat_this` / `htdemucs`，约 133 MB）运行在 Folia 的 Electron 主进程里，不在其 web
   bundle 中。关闭智能动感时（Folia 的默认值），所有样式的渲染与 Folia 完全一致。
-  **v0.1.2 起设置页直接移除了「智能动感模式」开关**——它无法生效；其余「有开关但不生效」的
-  条目（动感效果、罗马音/和声字幕、自定义字体与图片上传等）整理在
+  **v0.1.2 / v0.1.3 起设置页陆续移除了所有无法生效的开关与选项**（智能动感、动感效果、罗马音/
+  和声字幕、自定义字体、自定义背景、素材上传等）；保留的控件均会产生实际效果。清单见
   [docs/known-inert-settings.md](docs/known-inert-settings.md)。
 - **仅支持 Windows**（辅助进程依赖 WebView2 + Windows WASAPI）。
 - **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆
   变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
 - 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
+
+## v0.1.3 更新内容
+
+- **模组管理作者名改为 GitHub 账号** — 插件清单 `Plugin-Provider` 由 `dsh2 team` 改为 **`azkbzxf`**，
+  SPW「模组管理」的作者列随之更新。
+- **删除全部「有开关但无法生效」的设置** — 继 v0.1.2 移除「智能动感模式」后，v0.1.3 按
+  [docs/known-inert-settings.md](docs/known-inert-settings.md) 移除了：动感效果（推镜裂光/涟漪）、
+  自定义字体/系统字体、罗马音与和声字幕、自定义/URL 背景，以及凝彩图层图片、莫奈人像、群唱头像/
+  表情包等上传类控件（构建期从设置页剥离，不改 Folia 源码）。设置页现在只显示真正生效的控件。
+- **修复字体/字幕类设置无效** — 字体族（无衬线/衬线/等宽）与字重现在写入 `theme.fontStyle` /
+  `theme.fontWeight`；字幕字体跟随歌词或独立设置都会映射到 `subtitleTheme`；字幕内容模式归一化为
+  「翻译」。旧持久化值自动归一化。
+- 验证见 [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md)。
 
 ## v0.1.2 更新内容
 
@@ -80,6 +94,7 @@
 | 真实鼠标输入：悬停 ⚙ 打开「歌词样式」浮层，← 返回渲染器，ESC 关闭（exit 0） | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
 | **更多** 菜单中的 Folia 条目与宿主字体/星芒图标一致（v0.1.1）；**封面取色**随歌曲封面派生主题（v0.1.2，橙/黑纯色封面平均 RGB 165/105/66 vs 71/71/72） | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md) |
 | 设置/样式在 SPW 重启后保留；禁用插件后恢复 4 项菜单；5 次开/关与杀掉 SPW 后无残留辅助进程 | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
+| v0.1.3：模组管理作者名 = `azkbzxf`；A/B 组失效控件全部移除；字体族/字重/字幕字体在 `pushConfig` 中生效 | [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -90,7 +105,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.2.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.3.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -107,7 +122,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.2.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.3.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -120,8 +135,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.2.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.2.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.3.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.3.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

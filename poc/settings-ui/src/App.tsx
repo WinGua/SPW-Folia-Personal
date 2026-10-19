@@ -108,6 +108,17 @@ const App: React.FC<AppProps> = ({ injected }) => {
         };
     }, []);
 
+    // A settings file written before v0.1.3 may still select removed options; normalise it once so
+    // the reused panel renders sane values (custom font -> sans, romanization/both -> translation).
+    useEffect(() => {
+        const current = useSettingsStore.getState();
+        if (current.appearance.fontStyle === 'custom') current.setAppearance({ fontStyle: 'sans' });
+        if (current.subtitle.subtitleFontStyle === 'custom') current.setSubtitle({ subtitleFontStyle: 'sans' });
+        const mode = current.subtitle.subtitleContentMode;
+        if (mode === 'romanization' || mode === 'both') current.setSubtitle({ subtitleContentMode: 'translation' });
+        if ((current.backgroundMode as string) === 'url') current.setBackgroundMode('latent');
+    }, []);
+
     const styleEntry = getStyleEntry(visualizerMode);
     const styleDraft: StyleDraft = useMemo(() => ({
         tuning: state.styleTunings[visualizerMode],
@@ -119,15 +130,13 @@ const App: React.FC<AppProps> = ({ injected }) => {
     const backgroundConfig = useMemo(() => selectBackgroundConfig(state), [state]);
     const backgroundActions = useMemo(() => selectBackgroundActions(state), [state]);
 
+    // v0.1.3: custom font families are removed — the injected page has no font source, so the tile
+    // could never produce a working font. Only Folia's built-in sans/serif/mono remain.
     const fontStyleOptions = useMemo(() => ([
         { label: t('options.fontSans'), value: 'sans' as FontChoice },
         { label: t('options.fontSerif'), value: 'serif' as FontChoice },
         { label: t('options.fontMono'), value: 'mono' as FontChoice },
-        {
-            label: state.appearance.customFontFamily ?? t('options.customFont'),
-            value: 'custom' as FontChoice,
-        },
-    ]), [t, state.appearance.customFontFamily]);
+    ]), [t]);
 
     const previewPlaceholderOptions = useMemo(() => ([
         { label: t('options.previewTextDefault'), value: 'default' as PreviewPlaceholderId },

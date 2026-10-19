@@ -300,3 +300,34 @@ python packaging/tools/assemble-release.py ^
 v0.1.2 changes: cover-colour field fix (host mirrors `coverDataUrl`→`coverUrl`, page falls back),
 智能动感模式 card removed from the settings bundle, plus docs
 `verification-v0.1.2.md` / `known-inert-settings.md`. See `docs/release-notes-v0.1.2.md`.
+
+### v0.1.3 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.3.spmod   12,405,289 B   1,937 entries
+sha256  16bdda573be6f9fed29780881e94feb1f5c0a6d542260c024e4f284c8a5d41ea
+manifest: Plugin-Version 0.1.3 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.3.spmod 86,955 B
+        native/spw-folia-host.exe  : d75b97cbc692ab5e05b5b0cf2d2177002526849181a8787252a11cba896f71ad
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,054.1 kB, no smart-beat/beat-effect/harmony/
+                                      romanisation/custom-font/custom-background/upload controls)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+```
+
+Assembly commands (from repo root):
+
+```bat
+cd poc/settings-ui && npm run build && cd ../..
+cd spw-folia && gradlew.bat plugin && cd ..
+bash packaging/build-package.sh
+python packaging/tools/assemble-release.py ^
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.3.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.3.spmod
+```
+
+v0.1.3 changes: `Plugin-Provider` set to the GitHub account `azkbzxf`; all remaining inert controls
+removed at build time (beat effects, custom/system fonts, romanisation & duet subtitles, custom/URL
+backgrounds, tempera/monet/cappella uploads); group-C settings fixed by mapping font family/weight and
+subtitle fonts into `theme` / `subtitleTheme`. See `docs/verification-v0.1.3.md`,
+`docs/known-inert-settings.md`, `docs/release-notes-v0.1.3.md`.

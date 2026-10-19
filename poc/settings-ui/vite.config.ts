@@ -102,36 +102,158 @@ const debugWhoImports = (): Plugin => ({
     },
 });
 
-/** Removes Folia's 智能动感模式 card from the reused settings panel.
+/** Applies spw-folia's v0.1.3 settings surgery to the reused Folia panels.
  *
- *  Folia renders that card from SmartBeatSettingsCard inside VisPlaygroundSettingsPanel; the card
- *  only makes sense when the beat-analysis models (beat_this / htdemucs WebGPU) are present. Folia's
- *  desktop app ships them; the injected page has no such models and no beat stream, so the switch
- *  could never take effect — spw-folia v0.1.2 removes it instead of showing a dead toggle (the
- *  per-effect 动感效果 rows stay visible and are documented as unavailable in this integration).
- *  The transform fails the build when the marker is gone so a future Folia source update cannot
- *  silently bring the switch back. */
-const stripSmartBeatCard = (): Plugin => ({
-    name: 'spw-folia-strip-smart-beat',
+ *  The injected page cannot provide several things Folia's desktop app assumes, so the controls that
+ *  could never take effect are removed at build time instead of being shown as dead switches:
+ *
+ *  A. beat-driven animation (beat_this / htdemucs WebGPU models are not in the page, and the host
+ *     sends no beat events): 智能动感模式 card, 动感效果 card, 和声字幕 group (no harmony data), and
+ *     the 罗马音 subtitle content modes (translation is the only lyric sub-text the plugin sends).
+ *  B. uploads / custom media (no local file services, no IndexedDB asset store): custom font choice,
+ *     背景 URL image mode, and the tempera / monet / cappella image upload controls.
+ *
+ *  Every removal is marker-checked: if a future Folia update changes a panel the build fails instead
+ *  of silently shipping a dead control again. */
+interface SettingsSurgery {
+    what: string;
+    find: string | RegExp;
+    replace: string;
+}
+
+interface SettingsSurgeryFile {
+    /** Tail of the module id, slash-separated, relative to Folia's src/. */
+    suffix: string;
+    edits: SettingsSurgery[];
+}
+
+const SMART_BEAT_REVEAL = '{/* spw-folia v0.1.3: 智能动感模式开关已移除 — 注入页没有节拍分析模型（A1）。 */}';
+
+const SETTINGS_SURGERY: SettingsSurgeryFile[] = [
+    {
+        suffix: '/components/visualizer/window/VisPlaygroundSettingsPanel.tsx',
+        edits: [
+            {
+                what: 'SmartBeatSettingsCard element',
+                find: '                            <SmartBeatSettingsCard t={t} />\n',
+                replace: `                            ${SMART_BEAT_REVEAL}\n`,
+            },
+            {
+                what: 'SmartBeatSettingsCard import',
+                find: /^import SmartBeatSettingsCard from '[^']*';\r?\n/m,
+                replace: '',
+            },
+            {
+                what: 'BeatEffectsGroup element',
+                find: '                                {/* Its 智能动感模式 effects, each named, switched and scaled on its own. */}\n                                <BeatEffectsGroup\n                                    t={t}\n                                    effects={visualizerEntry.beatEffects}\n                                    onSliderPointerDown={onSliderPointerDown}\n                                    onSliderCommit={onSliderCommit}\n                                />\n',
+                replace: '',
+            },
+            {
+                what: 'BeatEffectsGroup import',
+                find: /^import BeatEffectsGroup from '[^']*';\r?\n/m,
+                replace: '',
+            },
+            {
+                what: 'background registry URL filter',
+                find: '        VISUALIZER_BACKGROUND_REGISTRY.map(entry => ({',
+                replace: "        VISUALIZER_BACKGROUND_REGISTRY.filter(entry => entry.mode !== 'url').map(entry => ({",
+            },
+            {
+                what: 'romanization subtitle content options',
+                find: "                                            { label: t('options.subtitleContentRomanization'), value: 'romanization' },\n                                            { label: t('options.subtitleContentBoth'), value: 'both' },\n",
+                replace: '',
+            },
+            {
+                what: 'custom font reveal block',
+                find: "                            <Reveal when={fontStyleValue === 'custom'}>\n                                <Row sub label={t('options.currentFont')}>\n                                    <Value tip={currentFontLabel}>{currentFontLabel}</Value>\n                                    <Button onClick={() => onFontStyleChange('custom')}>{t('options.chooseSystemFont')}</Button>\n                                </Row>\n                            </Reveal>\n",
+                replace: '',
+            },
+            {
+                what: 'harmony subtitle group',
+                find: "                            <Group def={HARMONY_GROUP}>\n                                <ToggleRow\n                                    label={t('options.showHarmonySubtitle')}\n                                    note={t('options.showHarmonySubtitleDesc')}\n                                    checked={showHarmonySubtitle}\n                                    disabled={!onToggleShowHarmonySubtitle}\n                                    onChange={next => onToggleShowHarmonySubtitle?.(next)}\n                                />\n                                <Reveal when={showHarmonySubtitle}>\n                                    <ToggleRow\n                                        sub\n                                        label={t('options.harmonySubtitleBackground')}\n                                        note={t('options.harmonySubtitleBackgroundDesc')}\n                                        checked={harmonySubtitleBackground}\n                                        disabled={!onToggleHarmonySubtitleBackground}\n                                        onChange={next => onToggleHarmonySubtitleBackground?.(next)}\n                                    />\n                                </Reveal>\n                            </Group>\n",
+                replace: '',
+            },
+        ],
+    },
+    {
+        suffix: '/components/visualizer/tempera/TemperaSettingsPanel.tsx',
+        edits: [
+            {
+                what: 'tempera image layer group',
+                find: '            <Group def={IMAGE_GROUP}>\n                <TemperaImageLayerControls\n                    images={temperaTuning.layerImages}\n                    depth={temperaTuning.layerImageDepth}\n                    frequency={temperaTuning.layerImageFrequency}\n                    rangeInputClass={rangeInputClass}\n                    isDaylight={isDaylight}\n                    onCommit={patch => onTemperaTuningChange?.(patch)}\n                />\n            </Group>\n\n',
+                replace: '',
+            },
+            {
+                what: 'TemperaImageLayerControls import',
+                find: /^import TemperaImageLayerControls from '[^']*';\r?\n/m,
+                replace: '',
+            },
+        ],
+    },
+    {
+        suffix: '/components/visualizer/monet/MonetSettingsPanel.tsx',
+        edits: [
+            {
+                what: 'monet custom portrait source option',
+                find: "                            {\n                                value: 'custom',\n                                label: t('options.monetPortraitSourceCustom'),\n                                disabled: !monetPortraitImage && !isLoadingMonetPortraitImage,\n                            },\n",
+                replace: '',
+            },
+            {
+                what: 'monet portrait upload row',
+                find: "                <Row\n                    label={t('options.monetUploadPortrait')}\n                    hint={feedback || monetPortraitImage?.name || '-'}\n                >\n                    <Button\n                        icon={ImagePlus}\n                        onClick={() => fileInputRef.current?.click()}\n                        disabled={isLoadingMonetPortraitImage || !onUploadMonetPortraitImage}\n                    >\n                        {t('options.monetUploadPortrait')}\n                    </Button>\n                    <Button\n                        icon={Trash2}\n                        onClick={() => void onClearMonetPortraitImage?.()}\n                        disabled={!monetPortraitImage || !onClearMonetPortraitImage}\n                    >\n                        {t('options.monetClearPortrait')}\n                    </Button>\n                    <input\n                        ref={fileInputRef}\n                        type=\"file\"\n                        accept=\".png,.jpg,.jpeg,.gif,.webp,.svg,image/*\"\n                        className=\"hidden\"\n                        onChange={(event) => void handleFileChange(event)}\n                    />\n                </Row>\n",
+                replace: '',
+            },
+        ],
+    },
+    {
+        suffix: '/components/visualizer/settingsPanels.tsx',
+        edits: [
+            {
+                what: 'cappella custom avatar source option',
+                find: "                            { value: 'custom', label: t('options.cappellaAvatarSourceCustom'), disabled: !hasCappellaCustomAvatar },\n",
+                replace: '',
+            },
+            {
+                what: 'cappella avatar upload row',
+                find: "            <Row\n                label={t('options.cappellaAvatarPreview')}\n                hint={hasCappellaCustomAvatar\n                    ? `${t('options.cappellaEmojiCount')} ${cappellaCustomAvatarImages.length}`\n                    : t('options.cappellaAvatarUploadHint')}\n                below={<CappellaImageSlots round images={cappellaCustomAvatarImages} emptyName={t('options.cappellaEmojiEmptySlot')} />}\n            >\n                <Button onClick={handleAvatarImportClick} disabled={isImportingAvatar || isCappellaCustomAvatarLoading}>\n                    {isImportingAvatar ? t('options.cappellaAvatarUploading') : t('options.cappellaAvatarUpload')}\n                </Button>\n                <Button\n                    onClick={() => void handleClearCustomAvatar()}\n                    disabled={!hasCappellaCustomAvatar || isImportingAvatar || isCappellaCustomAvatarLoading}\n                >\n                    {t('options.cappellaAvatarClear')}\n                </Button>\n                <input\n                    ref={avatarFileInputRef}\n                    type=\"file\"\n                    accept=\".png,.jpg,.jpeg,.gif,.webp,.svg,image/*\"\n                    multiple\n                    className=\"hidden\"\n                    onChange={(event) => void handleAvatarFileChange(event)}\n                />\n            </Row>\n",
+                replace: '',
+            },
+            {
+                what: 'cappella custom emoji source option',
+                find: "                            { value: 'custom', label: t('options.cappellaEmojiSourceCustom'), disabled: !hasCappellaCustomEmojiPack },\n",
+                replace: '',
+            },
+            {
+                what: 'cappella emoji upload row',
+                find: "                <Row\n                    sub\n                    label={t('options.cappellaEmojiPreview')}\n                    hint={hasCappellaCustomEmojiPack\n                        ? `${t('options.cappellaEmojiCount')} ${cappellaCustomEmojiCount}`\n                        : t('options.cappellaEmojiUploadHint')}\n                    below={<CappellaImageSlots images={cappellaCustomEmojiImages} emptyName={t('options.cappellaEmojiEmptySlot')} />}\n                >\n                    <Button onClick={handleImportClick} disabled={isImporting || isCappellaCustomEmojiPackLoading}>\n                        {isImporting ? t('options.cappellaEmojiUploading') : t('options.cappellaEmojiUpload')}\n                    </Button>\n                    <Button\n                        onClick={() => void handleClearCustomPack()}\n                        disabled={!hasCappellaCustomEmojiPack || isImporting || isCappellaCustomEmojiPackLoading}\n                    >\n                        {t('options.cappellaEmojiClear')}\n                    </Button>\n                    <input\n                        ref={emojiFileInputRef}\n                        type=\"file\"\n                        accept=\".png,.jpg,.jpeg,.gif,.webp,.svg,image/*\"\n                        multiple\n                        className=\"hidden\"\n                        onChange={(event) => void handleFileChange(event)}\n                    />\n                </Row>\n",
+                replace: '',
+            },
+        ],
+    },
+];
+
+const foliaSettingsSurgery = (): Plugin => ({
+    name: 'spw-folia-settings-surgery',
     enforce: 'pre',
     transform(code, id) {
         const normalized = id.replace(/\\/g, '/');
-        if (!normalized.endsWith('/components/visualizer/window/VisPlaygroundSettingsPanel.tsx')) return null;
-        const marker = '<SmartBeatSettingsCard t={t} />';
-        if (!code.includes(marker)) {
-            throw new Error('[spw-folia-strip-smart-beat] SmartBeatSettingsCard marker not found — Folia source changed, update the strip transform');
+        const group = SETTINGS_SURGERY.find(candidate => normalized.endsWith(candidate.suffix));
+        if (!group) return null;
+        let next = code;
+        for (const edit of group.edits) {
+            const matches = typeof edit.find === 'string' ? next.includes(edit.find) : edit.find.test(next);
+            if (!matches) {
+                throw new Error(`[spw-folia-surgery] ${group.suffix}: marker not found for "${edit.what}" — Folia source changed, update vite.config.ts`);
+            }
+            next = next.replace(edit.find, edit.replace);
         }
-        const replacement = '{/* spw-folia: the 智能动感模式 switch is removed here — beat models are unavailable in the injected page (v0.1.2). */}';
-        let next = code.replace(marker, replacement);
-        // Drop the now-unused import so the card's module and its stores are not pulled into the bundle.
-        next = next.replace(/^import SmartBeatSettingsCard from '[^']*';\r?\n/m, '');
         return { code: next, map: null };
     },
 });
 
 export default defineConfig({
     base: './',
-    plugins: [stripSmartBeatCard(), react(), foliaStubs(), debugWhoImports(), inlineCssIntoEntry(), tailwindcss()],
+    plugins: [foliaSettingsSurgery(), react(), foliaStubs(), debugWhoImports(), inlineCssIntoEntry(), tailwindcss()],
     resolve: {
         alias: [
             { find: /^@\//, replacement: `${foliaSrc}/` },

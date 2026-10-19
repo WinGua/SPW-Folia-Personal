@@ -133,4 +133,19 @@ Scope: cover-colour data path + removal of the 智能动感模式 card. Commands
 | Settings overlay in bundle mode | PASS — no 「智能动感模式」 text (`smart-beat:text-absent`), other cards/layout intact, 0 page errors |
 | Real SPW 1.19.0 install of v0.1.2 | PASS — plugin `start … version=0.1.2`, hook installed, menu Folia appended, click spawns `native/spw-folia-host.exe`, fullscreen 3200×2000 / page 1776×1110 / 3 canvases / 89–120 fps |
 | Real track payload | PASS — `track -> helper` with cover data URL present (104,346 / 80,099 / 164,307 B); theme name follows track (`THEME \| 安静`) instead of the fixed default |
+
+## Addendum — v0.1.3 regression (2026-10-19)
+
+Scope: mod-manager author rename, removal of all remaining inert settings controls, group-C
+mapping fix (font family/weight, subtitle fonts). Commands and raw evidence:
+`docs/verification-v0.1.3.md`.
+
+| check | result |
+| --- | --- |
+| Manifest author | PASS — `Plugin-Provider: azkbzxf` in `dist/release/spw-folia-0.1.3.spmod` and in the installed payload; mod manager reads this field |
+| A/B controls removed (12 build-time edits) | PASS — DOM audit `hasSmartBeat/hasBeatEffects/hasHarmony/hasRomanization/hasCustomFont/hasUrlBackground/hasUploadText` all false; 4 tabs intact, 0 files/pages errors |
+| C settings → config | PASS — `pushConfig`: serif+700 → `theme.fontStyle='serif', fontWeight=700`; mono+auto → `'mono'` no weight; subtitle inherit off → `subtitleTheme.fontStyle='serif', fontWeight=700`; `subtitleContentMode='translation'`; `showHarmonySubtitle=false` |
+| Legacy values migration | PASS — appearance.fontStyle custom→sans, subtitle font custom→sans, content mode romanization/both→translation, background url→latent |
+| Real SPW 1.19.0 install of v0.1.3 | PASS — `start … version=0.1.3`, hook appended/clicked, spawn from installed `native/` payload, fullscreen 3200×2000, settings inject `?v=0.1.3`, real mouse ⚙ opens panel (no inert controls), ESC closes overlay then window, `host-exit code=0 reason=user … lastFps=120`, no orphan helper |
+
 | Cursor behaviour on v0.1.2 build | PASS — host log `cursor hide overlay=closed idleMs=2507`, returns on movement, forced visible while overlay open (unchanged from v0.1.1) |

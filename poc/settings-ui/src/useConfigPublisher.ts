@@ -13,6 +13,7 @@ import {
 import { snapshotFromState, useSettingsStore } from '~/model/settings';
 import { ConfigPublisher, type PublisherLyricLine, type PublisherTrack } from '~/publisher/config';
 import { deriveThemeFromCover } from '~/publisher/deriveTheme';
+import { applyThemeFonts } from '~/publisher/themeFonts';
 import type { Theme } from '@/types';
 
 const isLyricLine = (value: unknown): value is { startMs: number; endMs: number; main: string } =>
@@ -71,27 +72,40 @@ export interface ConfigPublisherHandle {
 export const useConfigPublisher = (): void => {
     useEffect(() => {
         const bridge = getBridge();
-        let theme: Theme = DEMO_THEME;
+        // The cover-derived base theme; the 字体 settings are applied on top of it (v0.1.3).
+        let coverTheme: Theme = DEMO_THEME;
         let isDaylight = false;
         let lyrics: PublisherLyricLine[] = toPublisherLyrics(bridge.inputs?.lyrics);
         let track = toPublisherTrack(bridge.inputs?.track, lyrics);
         let disposed = false;
 
+        /** settings + theme + subtitleTheme, with the persisted 字体/字幕字体 selections applied. */
+        const themedInputs = () => {
+            const state = useSettingsStore.getState();
+            const theme = applyThemeFonts(coverTheme, state.appearance);
+            const subtitleTheme = state.subtitle.subtitleFontInheritsLyrics
+                ? theme
+                : applyThemeFonts(coverTheme, {
+                    fontStyle: state.subtitle.subtitleFontStyle,
+                    fontWeight: state.subtitle.subtitleFontWeight,
+                });
+            return { settings: snapshotFromState(state), theme, subtitleTheme };
+        };
+
         const publisher = new ConfigPublisher({ pushConfig: config => bridge.pushConfig(config) }, {
-            settings: snapshotFromState(useSettingsStore.getState()),
+            ...themedInputs(),
             track,
             lyricOffsetMs: bridge.inputs?.state?.lyricOffsetMs ?? 0,
             playerState: bridge.inputs?.state?.playerState ?? 'IDLE',
-            theme,
             isDaylight,
         });
 
         const refreshTheme = async () => {
             const result = await deriveThemeFromCover(track?.coverUrl ?? null, track?.title);
             if (disposed) return;
-            theme = result.theme;
+            coverTheme = result.theme;
             isDaylight = result.isDaylight;
-            publisher.update({ theme, isDaylight, subtitleTheme: theme });
+            publisher.update({ ...themedInputs(), isDaylight });
         };
 
         const applyTrack = (nextTrack: BridgeTrackMessage | null | undefined, nextLyrics: PublisherLyricLine[] | null) => {
@@ -101,8 +115,8 @@ export const useConfigPublisher = (): void => {
             if ((track?.coverUrl ?? null) !== previousCover) void refreshTheme();
         };
 
-        const unsubscribeStore = useSettingsStore.subscribe(state => {
-            publisher.update({ settings: snapshotFromState(state) });
+        const unsubscribeStore = useSettingsStore.subscribe(() => {
+            publisher.update(themedInputs());
         });
 
         const offTrack = bridgeOn<BridgeTrackMessage>('track', payload => applyTrack(payload, lyrics));
@@ -114,7 +128,7 @@ export const useConfigPublisher = (): void => {
         const offConfig = bridgeOn('hello', () => publisher.invalidate());
 
         void refreshTheme();
-        publisher.update({ settings: snapshotFromState(useSettingsStore.getState()), track, lyricOffsetMs: bridge.inputs?.state?.lyricOffsetMs ?? 0 });
+        publisher.update({ ...themedInputs(), track, lyricOffsetMs: bridge.inputs?.state?.lyricOffsetMs ?? 0 });
 
         // A settings UI only pushes when something moved; this first flush publishes the initial state.
         publisher.flush();

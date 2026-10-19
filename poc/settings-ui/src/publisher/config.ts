@@ -142,6 +142,12 @@ export const buildConfig = ({ settings, track, theme, subtitleTheme, isDaylight,
     const appearance = settings.appearance;
     const subtitle = settings.subtitle;
     const lyrics = buildLyricData(track);
+    // v0.1.3: the injected page only receives translation data from the plugin, so a persisted
+    // romanization / both selection degrades to translation instead of rendering nothing.
+    const subtitleContentMode: SubtitleContentMode = subtitle.subtitleContentMode === 'romanization'
+        || subtitle.subtitleContentMode === 'both'
+        ? 'translation'
+        : subtitle.subtitleContentMode as SubtitleContentMode;
     const coverUrl = track?.coverUrl ?? null;
     const config: ObsBrowserSourceConfig = {
         activePlaybackContext: 'main',
@@ -164,12 +170,13 @@ export const buildConfig = ({ settings, track, theme, subtitleTheme, isDaylight,
         subtitleOverlayOpacity: clamp(subtitle.subtitleOverlayOpacity, 0.2, 1),
         subtitleOverlayBackground: subtitle.subtitleOverlayBackground,
         subtitleUpcomingLyricsBlur: subtitle.subtitleUpcomingLyricsBlur,
-        showHarmonySubtitle: subtitle.showHarmonySubtitle,
-        harmonySubtitleBackground: subtitle.harmonySubtitleBackground,
+        // No harmony data arrives from the plugin, so the harmony overlay is always off (v0.1.3).
+        showHarmonySubtitle: false,
+        harmonySubtitleBackground: false,
         staticMode: false,
         hideTranslationSubtitle: subtitle.hideTranslationSubtitle,
-        showSubtitleTranslation: !subtitle.hideTranslationSubtitle && subtitle.subtitleContentMode !== 'none',
-        subtitleContentMode: subtitle.subtitleContentMode as SubtitleContentMode,
+        showSubtitleTranslation: !subtitle.hideTranslationSubtitle && subtitleContentMode !== 'none',
+        subtitleContentMode,
         seed: seed ?? track?.id ?? CONFIG_SEED_FALLBACK,
         updatedAt: Date.now(),
     };

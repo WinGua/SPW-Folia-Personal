@@ -294,3 +294,17 @@ npm run build        # = vite build，产物在 dist/
    构建时精确替换 `VisPlaygroundSettingsPanel.tsx` 里的 `<SmartBeatSettingsCard t={t} />`（找不到即抛错），
    不修改 Folia 上游源码；`SmartBeatSettingsCard` 不再进入 bundle。「动感效果」等其它卡片保持不变。
 3. 失效开关清单：`docs/known-inert-settings.md`。
+
+## 14. v0.1.3 变更（2026-10-19）
+
+1. **A/B 组控件剥离**：`vite.config.ts` 的 `stripSmartBeatCard()` 升级为数据驱动的
+   `foliaSettingsSurgery()`（`enforce:'pre'`，标记缺失即抛错），共 12 处编辑：VisPlaygroundSettingsPanel
+   （智能动感卡片、动感效果、背景 url 项、罗马音/两者选项、自定义字体 Reveal、和声分组）、
+   Tempera（图像图层分组）、Monet（自定义人像来源 + 上传行）、Cappella（自定义头像/表情包来源 +
+   两条上传行）。Folia 上游源码不变。
+2. **C 组映射修复**：新增 `src/publisher/themeFonts.ts` 的 `applyThemeFonts()`；`useConfigPublisher`
+   的主题 = 封面派生主题 + 字体族/字重合成，字幕主题按「跟随歌词」继承或独立映射；`config.ts`
+   归一化 `subtitleContentMode` 并固定和声字段为 false。此前字体族/字重/字幕字体从不进入 config。
+3. **旧值迁移**：`App.tsx` 挂载时归一化持久化设置（custom→sans、romanization/both→translation、
+   url→latent），并移除自定义字体磁贴。
+4. 验证：`docs/verification-v0.1.3.md`（DOM + pushConfig 断言 + 真实 SPW 截图）。
