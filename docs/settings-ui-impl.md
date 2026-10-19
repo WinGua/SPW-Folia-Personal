@@ -281,3 +281,16 @@ npm run build        # = vite build，产物在 dist/
 修复的 4 处可见偏差：`--text-primary` 取配色主题（原为 kit fallback）、补齐 Folia `@theme` CJK 字体栈、body/滚动条配色对齐、背景格改为 Folia glyph fallback（原为渐变占位）。
 
 另修复 1 处**真实输入回归（F5，非视觉差异）**：注入挂载根是 `pointer-events:none` 穿透层，⚙ 未显式开启命中测试，导致真实鼠标点不到 ⚙（合成 `.click()` 测不出来）；已在 `.spw-chrome-btn` 加 `pointer-events:auto`、隐藏态保持 `none`，并用真实宿主 `elementFromPoint` 命中测试 + 完整 chrome/ESC 契约回归验证（上方 §8 实测块）。细节与复跑命令见 `research/settings-ui/fidelity-diff.md` §3.5。
+
+
+## 13. v0.1.2 变更（2026-10-19）
+
+1. **封面取色修复**：`bridge.ts` 新增 `BridgeTrackMessage.coverDataUrl` 与
+   `bridgeTrackCover(track) = track.coverUrl ?? track.coverDataUrl`；`useConfigPublisher.ts`
+   的 `toPublisherTrack()` 改用 `bridgeTrackCover()`，因此宿主转发的 `coverDataUrl` 也能触发
+   `deriveThemeFromCover()`。验证见 `docs/verification-v0.1.2.md`（纯色封面实验：橙 RGB 165/105/66，
+   黑 71/71/72）。
+2. **移除「智能动感模式」卡片**：`vite.config.ts` 新增 `stripSmartBeatCard()`（`enforce:'pre'`）——
+   构建时精确替换 `VisPlaygroundSettingsPanel.tsx` 里的 `<SmartBeatSettingsCard t={t} />`（找不到即抛错），
+   不修改 Folia 上游源码；`SmartBeatSettingsCard` 不再进入 bundle。「动感效果」等其它卡片保持不变。
+3. 失效开关清单：`docs/known-inert-settings.md`。

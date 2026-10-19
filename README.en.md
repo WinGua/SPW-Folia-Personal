@@ -25,8 +25,10 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   心象 (cadenza) · 云阶 (partita) · 浮名 (fume) · 倾诉 (tilt) · 回环 (claddagh) · 莫奈 (monet) ·
   时计 (pendolo) · 群唱 (cappella) · 镜台 (diorama) · 静止 (still).
 - **Folia's settings page, 1:1** — the 「歌词样式」 window (tabs 歌词动画 / 背景 / 字体 / 字幕,
-  14-style live grid, 默认 reset, 智能动感模式, 推镜裂光 强度, 纹理分辨率, 镜头运动强度,
-  文字动势, per-style tunings) reusing Folia's own React components.
+  14-style live grid, 默认 reset, 纹理分辨率, 镜头运动强度, 文字动势, per-style tunings)
+  reusing Folia's own React components.
+- **Cover-colour theming** — theme, background tint and accent are derived from the current track's
+  album art (fixed in v0.1.2) and follow cover changes live.
 - **Synced to SPW playback** — track, lyrics timeline (word-level cells), subtitle translation,
   play/pause/seek/rate are bridged from SPW's playback API plus a smooth interpolated timeline.
 - **Audio-reactive** — WASAPI system-loopback capture with Folia-compatible 1024-bin spectrum and
@@ -41,13 +43,27 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
 - **智能动感模式 (Smart Beat) beat effects are not included in v1**: the Folia OBS surface exposes no
   beat events, and Folia's beat models (`beat_this` / `htdemucs`, ~133 MB) run in Folia's Electron main
   process and are not part of its web bundle. With smart beat off (Folia's default) every style renders
-  identically to Folia. The Folia settings UI is kept intact, so the switch is visible but has no
-  effect in v1.
+  identically to Folia. **Since v0.1.2 the 智能动感模式 switch is removed from the settings page** — it
+  could never have an effect; the remaining inert controls (beat effects, romanised/duet subtitles,
+  custom fonts and image uploads, unmapped font fields) are listed in
+  [docs/known-inert-settings.md](docs/known-inert-settings.md).
 - **Windows only** (the helper uses WebView2 + Windows WASAPI).
 - **Pinned to Salt Player for Windows 1.19.0** — the menu hook targets one host build
   (SPW's internal names are obfuscated per release); the plugin refuses to install the hook on other
   versions. See [docs/hook-target.md](docs/hook-target.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
+
+## What's new in v0.1.2
+
+- **Cover colour fixed** — the plugin sends the cover as `coverDataUrl`, but the settings page only
+  read `coverUrl`, so the derived theme always stayed on the default dark palette. The host now emits
+  both spellings and the page falls back to `coverDataUrl`; the fullscreen theme/background/accent now
+  follow the current album art (orange cover → warm theme, near-black cover → neutral; see
+  [docs/images/cover-color.jpg](docs/images/cover-color.jpg) and
+  [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md)).
+- **「智能动感模式」 switch removed** — stripped from the settings page at build time (other cards are
+  untouched), since the beat models are not in the web bundle.
+- **Inert controls documented** — see [docs/known-inert-settings.md](docs/known-inert-settings.md).
 
 ## What's new in v0.1.1
 
@@ -70,7 +86,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | Fullscreen 3200x2000 at 175% DPI, page 1776x1110 dpr1, 3 canvases, 110-120 fps; stable 16-min soak (66-67.5 MB working set) | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
 | Playhead + word-level lyrics advance from SPW playback (100 ms interpolated timeline); pause/resume and seek follow | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
 | Real mouse input: hover ⚙ opens the 歌词样式 overlay, ← returns to the renderer, ESC closes (exit 0) | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
-| **Folia** item matches host menu typography/sparkle icon; cursor hides when idle, returns on move, stays visible with settings open, real ⚙ click opens the panel (v0.1.1 regression) | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/plugin-integration.md](docs/plugin-integration.md) §7 |
+| **Folia** item matches host menu typography/sparkle icon (v0.1.1); **cover-colour theming** follows the album art (v0.1.2: orange vs black cover mean RGB 165/105/66 vs 71/71/72) | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md) |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
 | Full acceptance matrix (track change / seek / pause / no-lyrics / lifecycle / persistence / soak) | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
@@ -82,7 +98,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
 Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
 
-1. Download `spw-folia-0.1.1.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.1.2.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -100,7 +116,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.1.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.2.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -113,8 +129,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.1.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.1.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.2.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.2.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 

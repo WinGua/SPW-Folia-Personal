@@ -272,3 +272,31 @@ WebView2 Runtime (system component).
    (`folia-major 0.7.21`), WebView2 SDK/NuGet version and tested WebView2 Runtime version
    (150.0.4078.83), settings island build.
 7. No secrets in the artifact (`packaging/` contains no credentials).
+
+
+### v0.1.2 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.2.spmod   12,450,848 B   1,938 entries
+sha256  2dc2f46b8635bd4918f45b65e9cd36d814c876e8c9f5a7827da4d0621174a0b9
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.2.spmod
+                                  8c6df3c4337a656f2f64cea3fcef03b587609389d75fcdf19a8e821798844155
+        native/spw-folia-host.exe  : fdac12775a62621bcf379df950a4f64149fe53bd2124281ce475c3ceef364a0a (115,712 B)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,192.9 kB, no SmartBeat card)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+```
+
+Assembly commands (from repo root):
+
+```bat
+cd spw-folia && gradlew.bat plugin && cd ..
+bash packaging/build-package.sh
+python packaging/tools/assemble-release.py ^
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.2.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.2.spmod
+```
+
+v0.1.2 changes: cover-colour field fix (host mirrors `coverDataUrl`→`coverUrl`, page falls back),
+智能动感模式 card removed from the settings bundle, plus docs
+`verification-v0.1.2.md` / `known-inert-settings.md`. See `docs/release-notes-v0.1.2.md`.

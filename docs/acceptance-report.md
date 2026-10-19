@@ -118,3 +118,19 @@ unreliable) + `cycle-test.ps1` / `orphan-test.ps1`.
 | V8 | no orphan `spw-folia-host.exe` after SPW exits | PASS | `poc/hook/orphan-test.ps1` output |
 
 Result: **CURSOR-FIX PASS** (5/5 assertions) and orphan test PASS on the final v0.1.1 payload.
+
+
+---
+
+## Addendum — v0.1.2 regression (2026-10-19)
+
+Scope: cover-colour data path + removal of the 智能动感模式 card. Commands and raw evidence:
+`docs/verification-v0.1.2.md`.
+
+| check | result |
+| --- | --- |
+| Local host harness, orange cover (#E85D04) vs near-black (#09090B), same track/lyrics/state | PASS — mean RGB 165.3/104.9/65.8 (R−B +99.5) vs 71.0/71.0/71.9 (R−B −0.9) |
+| Settings overlay in bundle mode | PASS — no 「智能动感模式」 text (`smart-beat:text-absent`), other cards/layout intact, 0 page errors |
+| Real SPW 1.19.0 install of v0.1.2 | PASS — plugin `start … version=0.1.2`, hook installed, menu Folia appended, click spawns `native/spw-folia-host.exe`, fullscreen 3200×2000 / page 1776×1110 / 3 canvases / 89–120 fps |
+| Real track payload | PASS — `track -> helper` with cover data URL present (104,346 / 80,099 / 164,307 B); theme name follows track (`THEME \| 安静`) instead of the fixed default |
+| Cursor behaviour on v0.1.2 build | PASS — host log `cursor hide overlay=closed idleMs=2507`, returns on movement, forced visible while overlay open (unchanged from v0.1.1) |

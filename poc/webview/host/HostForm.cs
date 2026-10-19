@@ -975,15 +975,26 @@ namespace SpwFolia
         private void SendTrackToPage(Dictionary<string, object> msg)
         {
             StringBuilder sb = new StringBuilder("{\"type\":\"track\"");
-            string[] keys = new string[] { "id", "title", "artist", "album", "coverDataUrl", "coverPath" };
+            string[] keys = new string[] { "id", "title", "artist", "album", "coverDataUrl", "coverUrl", "coverPath" };
+            // The plugin reports the cover as `coverDataUrl` (a data: URL); the injected settings
+            // page and Folia's own config type read `coverUrl`. Emit both spellings from one value so
+            // the cover reaches the page under either name — this drives the 封面取色 theme derivation
+            // and every style that draws the cover.
+            string coverForPage = null;
             for (int i = 0; i < keys.Length; i++)
             {
                 object value;
                 if (!msg.TryGetValue(keys[i], out value) || value == null) continue;
-                if (keys[i] == "coverDataUrl" || keys[i] == "coverPath" || keys[i] == "title" || keys[i] == "artist" || keys[i] == "album" || keys[i] == "id")
+                string text = Convert.ToString(value, Inv);
+                if (keys[i] == "coverDataUrl" || keys[i] == "coverUrl") coverForPage = text;
+                if (keys[i] == "coverDataUrl" || keys[i] == "coverUrl" || keys[i] == "coverPath" || keys[i] == "title" || keys[i] == "artist" || keys[i] == "album" || keys[i] == "id")
                 {
-                    sb.Append(",\"").Append(keys[i]).Append("\":\"").Append(JsonUtil.Escape(Convert.ToString(value, Inv))).Append('"');
+                    sb.Append(",\"").Append(keys[i]).Append("\":\"").Append(JsonUtil.Escape(text)).Append('"');
                 }
+            }
+            if (coverForPage != null && !msg.ContainsKey("coverUrl"))
+            {
+                sb.Append(",\"coverUrl\":\"").Append(JsonUtil.Escape(coverForPage)).Append('"');
             }
             object duration;
             if (msg.TryGetValue("durationMs", out duration)) sb.Append(",\"durationMs\":").Append(JsonUtil.Num(ToDouble(duration)));

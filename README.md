@@ -24,8 +24,9 @@
   心象 (cadenza) · 云阶 (partita) · 浮名 (fume) · 倾诉 (tilt) · 回环 (claddagh) · 莫奈 (monet) ·
   时计 (pendolo) · 群唱 (cappella) · 镜台 (diorama) · 静止 (still)。
 - **Folia 设置页 1:1 还原** —「歌词样式」窗口（歌词动画 / 背景 / 字体 / 字幕 四个标签页、
-  14 样式实时网格、默认 重置、智能动感模式、推镜裂光强度、纹理分辨率、镜头运动强度、文字动势、
-  各样式专属调节项），复用 Folia 自己的 React 组件。
+  14 样式实时网格、默认 重置、纹理分辨率、镜头运动强度、文字动势、各样式专属调节项），
+  复用 Folia 自己的 React 组件。
+- **封面取色** — 主题、背景与强调色由当前歌曲封面派生（v0.1.2 修复），随封面切换实时变化。
 - **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自
   SPW 播放 API 加一条平滑插值时间轴。
 - **音频响应** — 在原生辅助进程内完成 WASAPI 系统回环采集，输出与 Folia 兼容的 1024-bin 频谱和
@@ -37,14 +38,27 @@
 
 ### v1 限制
 
-- **智能动感模式（Smart Beat）的节拍特效未包含在 v1**：Folia OBS 接口不暴露节拍事件，而 Folia 的
+- **智能动感的节拍特效未包含在 v1**：Folia OBS 接口不暴露节拍事件，而 Folia 的
   节拍模型（`beat_this` / `htdemucs`，约 133 MB）运行在 Folia 的 Electron 主进程里，不在其 web
-  bundle 中。关闭智能动感时（Folia 的默认值），所有样式的渲染与 Folia 完全一致。设置界面原样保留，
-  因此该开关可见，但在 v1 中没有实际效果。
+  bundle 中。关闭智能动感时（Folia 的默认值），所有样式的渲染与 Folia 完全一致。
+  **v0.1.2 起设置页直接移除了「智能动感模式」开关**——它无法生效；其余「有开关但不生效」的
+  条目（动感效果、罗马音/和声字幕、自定义字体与图片上传等）整理在
+  [docs/known-inert-settings.md](docs/known-inert-settings.md)。
 - **仅支持 Windows**（辅助进程依赖 WebView2 + Windows WASAPI）。
 - **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆
   变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
 - 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
+
+## v0.1.2 更新内容
+
+- **修复封面取色** — 插件发送的封面字段是 `coverDataUrl`，设置页却只读 `coverUrl`，导致主题始终
+  停留在默认深色。现在宿主同时发送两种拼写、页面侧回退到 `coverDataUrl`，全屏主题/背景/强调色
+  随当前封面变化（橙色封面 → 暖色主题；近黑封面 → 中性深色，见
+  [docs/images/cover-color.jpg](docs/images/cover-color.jpg) 与
+  [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md)）。
+- **移除「智能动感模式」开关** — 构建期从设置页剥离该卡片（不影响其它卡片），因为节拍模型不在
+  web bundle 中、开关不会有任何效果。
+- **整理失效开关清单** — 见 [docs/known-inert-settings.md](docs/known-inert-settings.md)。
 
 ## v0.1.1 更新内容
 
@@ -64,7 +78,7 @@
 | 全屏 3200x2000 @175% DPI，页面 1776x1110 dpr1，3 个 canvas，110-120 fps；16 分钟长稳测试稳定（66-67.5 MB 工作集） | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
 | 播放进度 + 逐字歌词随 SPW 播放推进（100 ms 插值时间轴）；暂停/继续与跳转跟随 | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
 | 真实鼠标输入：悬停 ⚙ 打开「歌词样式」浮层，← 返回渲染器，ESC 关闭（exit 0） | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
-| **Folia** 条目与宿主菜单字体/星芒图标一致；光标空闲隐藏、移动恢复、设置打开时常显，真实点击 ⚙ 可打开面板（v0.1.1 回归） | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/plugin-integration.md](docs/plugin-integration.md) §7 |
+| **更多** 菜单中的 Folia 条目与宿主字体/星芒图标一致（v0.1.1）；**封面取色**随歌曲封面派生主题（v0.1.2，橙/黑纯色封面平均 RGB 165/105/66 vs 71/71/72） | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md) |
 | 设置/样式在 SPW 重启后保留；禁用插件后恢复 4 项菜单；5 次开/关与杀掉 SPW 后无残留辅助进程 | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
@@ -76,7 +90,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.1.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.2.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -93,7 +107,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.1.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.2.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -106,8 +120,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.1.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.1.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.2.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.2.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

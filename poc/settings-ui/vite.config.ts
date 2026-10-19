@@ -102,9 +102,36 @@ const debugWhoImports = (): Plugin => ({
     },
 });
 
+/** Removes Folia's 智能动感模式 card from the reused settings panel.
+ *
+ *  Folia renders that card from SmartBeatSettingsCard inside VisPlaygroundSettingsPanel; the card
+ *  only makes sense when the beat-analysis models (beat_this / htdemucs WebGPU) are present. Folia's
+ *  desktop app ships them; the injected page has no such models and no beat stream, so the switch
+ *  could never take effect — spw-folia v0.1.2 removes it instead of showing a dead toggle (the
+ *  per-effect 动感效果 rows stay visible and are documented as unavailable in this integration).
+ *  The transform fails the build when the marker is gone so a future Folia source update cannot
+ *  silently bring the switch back. */
+const stripSmartBeatCard = (): Plugin => ({
+    name: 'spw-folia-strip-smart-beat',
+    enforce: 'pre',
+    transform(code, id) {
+        const normalized = id.replace(/\\/g, '/');
+        if (!normalized.endsWith('/components/visualizer/window/VisPlaygroundSettingsPanel.tsx')) return null;
+        const marker = '<SmartBeatSettingsCard t={t} />';
+        if (!code.includes(marker)) {
+            throw new Error('[spw-folia-strip-smart-beat] SmartBeatSettingsCard marker not found — Folia source changed, update the strip transform');
+        }
+        const replacement = '{/* spw-folia: the 智能动感模式 switch is removed here — beat models are unavailable in the injected page (v0.1.2). */}';
+        let next = code.replace(marker, replacement);
+        // Drop the now-unused import so the card's module and its stores are not pulled into the bundle.
+        next = next.replace(/^import SmartBeatSettingsCard from '[^']*';\r?\n/m, '');
+        return { code: next, map: null };
+    },
+});
+
 export default defineConfig({
     base: './',
-    plugins: [react(), foliaStubs(), debugWhoImports(), inlineCssIntoEntry(), tailwindcss()],
+    plugins: [stripSmartBeatCard(), react(), foliaStubs(), debugWhoImports(), inlineCssIntoEntry(), tailwindcss()],
     resolve: {
         alias: [
             { find: /^@\//, replacement: `${foliaSrc}/` },

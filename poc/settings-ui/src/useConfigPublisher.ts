@@ -5,6 +5,7 @@ import {
     getBridge,
     bridgeOn,
     bridgeIsInjected,
+    bridgeTrackCover,
     DEMO_TRACK,
     DEMO_THEME,
     type BridgeTrackMessage,
@@ -57,7 +58,8 @@ const toPublisherTrack = (track: BridgeTrackMessage | null | undefined, lyrics: 
         title: source.title ?? 'Unknown Track',
         artist: source.artist ?? null,
         album: source.album ?? null,
-        coverUrl: source.coverUrl ?? null,
+        // Accept both `coverUrl` and the plugin-side `coverDataUrl` spelling (see bridge.ts).
+        coverUrl: bridgeTrackCover(source),
         lyrics,
     };
 };

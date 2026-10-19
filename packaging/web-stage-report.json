@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-10-19T00:50:49.490Z",
+  "generatedAt": "2026-10-19T04:09:45.524Z",
   "out": "packaging/web",
   "webFiles": 1877,
   "webBytes": 20546706,
   "hostScriptCopies": 2,
   "settingsFiles": 16,
-  "settingsBytes": 2414130,
-  "totalBytes": 22960836,
+  "settingsBytes": 2413806,
+  "totalBytes": 22960512,
   "excluded": {
     "swTrio": [
       "registerSW.js",

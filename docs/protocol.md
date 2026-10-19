@@ -26,10 +26,16 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 | `settings` | `settings: object` | 全量持久化设置（启动时一次；UI 每次改动后回传一次做确认） |
 | `state` | `posMs:int`, `durationMs:int`, `playing:bool`, `rate:number`, `tsMs:int64` | 播放时钟，建议 100ms 一次（≥20Hz）。页面按 `tsMs + (now-tsMs)*rate` 插值 |
 | `lyrics` | `lines:[{startMs,endMs,main,sub,cells:[{startMs,endMs,text}]}]`, `offsetMs:int`, `translationMode?` | 曲目/歌词变化时发送；空数组=无歌词 |
-| `track` | `id`, `title`, `artist`, `album`, `durationMs`, `coverDataUrl?`, `coverPath?` | 封面优先 data URL（JPEG/PNG base64），否则宿主负责本地读取 |
+| `track` | `id`, `title`, `artist`, `album`, `durationMs`, `coverDataUrl?`, `coverPath?` | 封面优先 data URL（JPEG/PNG base64），否则宿主负责本地读取。宿主转发页面时同时给出 `coverUrl` 镜像（v0.1.2+，见 §1.1） |
 | `config` | `config: object` | 可选覆盖：插件强制推送完整 Folia `ObsBrowserSourceConfig`（调试/兼容用，正常不用） |
 | `audioMode` | `mode:"loopback"|"host-fft"|"off"` | 可选；默认 loopback |
 | `quit` | — | 请求优雅退出 |
+
+### 1.1 封面字段兼容（v0.1.2）
+
+`coverDataUrl` 是 Kotlin 插件发送的规范字段（base64 data URL）。宿主转发给页面时，把同一值**镜像**为
+`coverUrl`，以同时满足 Folia 自身 `ObsBrowserSourceConfig.coverUrl` 与旧调试脚本；页面消费方可读任一拼写，
+设置岛 `bridge.ts` 的 `bridgeTrackCover(track)` 优先 `coverUrl`、回退 `coverDataUrl`。
 
 ## 2. 宿主 → 插件（stdout，每行一个 JSON 对象）
 

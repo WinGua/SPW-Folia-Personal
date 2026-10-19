@@ -21,10 +21,20 @@ export interface BridgeTrackMessage {
     title: string;
     artist?: string | null;
     album?: string | null;
+    /** Preferred spelling (Folia's config type). */
     coverUrl?: string | null;
+    /** The plugin/host also report the cover under this name; `bridgeTrackCover` accepts both. */
+    coverDataUrl?: string | null;
     durationMs?: number;
     lyrics?: unknown;
 }
+
+/** The cover can arrive as `coverUrl` (page/config naming) or `coverDataUrl` (plugin naming). */
+export const bridgeTrackCover = (track: BridgeTrackMessage | null | undefined): string | null => {
+    if (!track) return null;
+    const value = track.coverUrl ?? track.coverDataUrl ?? null;
+    return typeof value === 'string' && value.length > 0 ? value : null;
+};
 
 export interface SpwFoliaBridge {
     protocol?: number;

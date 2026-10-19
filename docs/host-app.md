@@ -76,6 +76,11 @@ spw-folia-host.exe [options]
 | `--no-esc` | ESC closes | disable ESC-to-close (kiosk tests). |
 | `--keep-alive` / `--exit-on-stdin-close` | exit on stdin EOF | controls whether stdin EOF closes the helper (`--keep-alive` keeps it alive). |
 | `--demo` / `--no-demo` | off | embed the synthetic demo config + auto-patch stdin lyrics/track into Folia shape (standalone runs). |
+
+Track messages carry the album cover as a base64 data URL (`coverDataUrl`). Since v0.1.2 the host
+forwards the same value to the page under **both** `coverDataUrl` and `coverUrl` (mirror), because the
+Folia settings island's theme derivation reads `coverUrl`. Without the mirror the derived theme silently
+stayed at the default palette — see `docs/verification-v0.1.2.md`.
 | `--mode <name>` | from config | force `visualizerMode` in the embedded demo config. |
 | `--dev-settings <json-or-path>` | – | initial settings tree: inline JSON or a path to a `.json` file; used to feed the injected settings UI at startup. |
 | `--assets <dir>` | – | extra static dir mapped to `https://spw-folia-assets.local/`. |

@@ -53,3 +53,6 @@ packaging/size-report.json
 
 # hook acceptance evidence: screenshots stay local; docs/acceptance-report.md records the results
 poc/hook/acceptance/
+
+# transient verification fixtures (poc/hook/verify-cover.mjs outputs)
+/tmp-verify/
