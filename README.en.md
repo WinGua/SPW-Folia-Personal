@@ -67,6 +67,8 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   the subtitle content mode is normalised to translation. Legacy persisted values are migrated.
 - Evidence: [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md).
 
+![spw-folia 0.1.3 in the mod manager: author azkbzxf](docs/images/mod-manager.jpg)
+
 ## What's new in v0.1.2
 
 - **Cover colour fixed** — the plugin sends the cover as `coverDataUrl`, but the settings page only

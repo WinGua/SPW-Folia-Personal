@@ -63,6 +63,8 @@
   「翻译」。旧持久化值自动归一化。
 - 验证见 [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md)。
 
+![模组管理中的 spw-folia 0.1.3：作者 azkbzxf](docs/images/mod-manager.jpg)
+
 ## v0.1.2 更新内容
 
 - **修复封面取色** — 插件发送的封面字段是 `coverDataUrl`，设置页却只读 `coverUrl`，导致主题始终
