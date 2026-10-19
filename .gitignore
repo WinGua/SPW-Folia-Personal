@@ -60,3 +60,8 @@ poc/hook/acceptance/
 # local-only hook artifacts: installed-plugin backups and ad-hoc verification fixtures
 poc/hook/backup/
 poc/hook/tmp-verify/
+
+# local verification scratch (screenshots, logs, probes output)
+/tmp-inspect/
+poc/webview/host/repro/*.exe
+poc/webview/host/repro/*.dll

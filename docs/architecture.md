@@ -69,8 +69,10 @@ Salt Player for Windows 1.19.0 (JVM/Compose)  ── spawn ──▶  spw-folia-
 
 - 更多 menu → item **Folia** (bell/graphic icon) → start helper, go fullscreen within ~1s.
 - Fullscreen = Folia visualizer only (like Folia's player view), plus minimal chrome we own:
-  top-right **settings gear** (opens the 歌词样式 panel), top-left **back/close** button; mouse hides cursor
-  after idle, chrome auto-hides, ESC = close settings panel if open else close window.
+  top-right **settings gear** (opens the 歌词样式 panel), top-left **back/close** button, bottom-right
+  **player background button** (v0.1.7, gold sliders icon → panel with the 播放页透明背景 switch, keeps the
+  chrome visible while transparency is on); mouse hides cursor after idle, chrome auto-hides, ESC = close
+  settings panel if open else close window.
 - First run (no saved settings) opens the settings panel so the styles UI is immediately visible; thereafter
   remembers last panel state. Clicking menu item again while session open → no second window (bring to front).
 - Close → host sends `closed`, plugin stops state feed, waits exit (kill after 2s), reopens cleanly next time.

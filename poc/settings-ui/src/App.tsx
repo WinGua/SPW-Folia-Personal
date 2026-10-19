@@ -34,6 +34,7 @@ import {
     setSettingsUiOpenState,
     subscribeSettingsRoundTrip,
 } from '~/bridge';
+import PlayerBackgroundControl from '~/chrome/PlayerBackgroundControl';
 import { useConfigPublisher } from '~/useConfigPublisher';
 
 interface AppProps {
@@ -46,9 +47,29 @@ const App: React.FC<AppProps> = ({ injected }) => {
     const [open, setOpen] = useState(() => !injected);
     /** protocol §7.5 v1 chrome: the gear fades out together with the cursor after 2.5 s idle. */
     const [chromeVisible, setChromeVisible] = useState(true);
+    /** v0.1.7: bottom-right panel holding the player-page transparent-background switch. */
+    const [playerPanelOpen, setPlayerPanelOpen] = useState(false);
     const visualizerMode = state.visualizerMode;
+    /** v0.1.7: with the player background transparent the page is click-through on its keyed pixels,
+     *  so the chrome buttons must stay pinned on screen — otherwise they could never be clicked again. */
+    const chromeAlwaysOn = state.transparentPlayerBackground === true;
 
     useConfigPublisher();
+
+    /* v0.1.7: the transparent player background makes the host window click-through, so the host
+     * turns it back off with a global hotkey (Ctrl+Alt+B) and calls this hook to keep the switch and
+     * the persisted setting in sync. */
+    useEffect(() => {
+        const target = window as unknown as {
+            __spwFoliaSetTransparent?: (on: boolean) => void;
+        };
+        target.__spwFoliaSetTransparent = on => {
+            useSettingsStore.getState().setTransparentPlayerBackground(on);
+        };
+        return () => {
+            delete target.__spwFoliaSetTransparent;
+        };
+    }, []);
 
     // Folia's settings window tints all of its text from the global --text-primary the app shell
     // sets from the current theme; the injected bundle owns that variable for the overlay subtree.
@@ -73,6 +94,25 @@ const App: React.FC<AppProps> = ({ injected }) => {
     }, []);
 
     useEffect(() => registerSettingsUiController({ open: () => setOpen(true), close }), [close]);
+
+    // The settings overlay covers the stage; fold the small player-background panel away with it.
+    useEffect(() => {
+        if (open) setPlayerPanelOpen(false);
+    }, [open]);
+
+    // v0.1.7: while the player-background panel is open it owns ESC (panel first, window second) —
+    // window-capture + stopPropagation keeps both our settings listener and the host's Escape out.
+    useEffect(() => {
+        if (!playerPanelOpen) return undefined;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.preventDefault();
+            event.stopPropagation();
+            setPlayerPanelOpen(false);
+        };
+        window.addEventListener('keydown', onKeyDown, true);
+        return () => window.removeEventListener('keydown', onKeyDown, true);
+    }, [playerPanelOpen]);
 
     useEffect(() => {
         if (!open) return undefined;
@@ -145,11 +185,24 @@ const App: React.FC<AppProps> = ({ injected }) => {
 
     return (
         <>
+            {/* v0.1.7: Folia's own player-chrome row, reachable from the player's bottom-right corner. */}
+            <PlayerBackgroundControl
+                visible={chromeAlwaysOn || ((chromeVisible || playerPanelOpen) && !open)}
+                open={playerPanelOpen}
+                onOpenChange={setPlayerPanelOpen}
+                enabled={state.transparentPlayerBackground}
+                onToggle={value => state.setTransparentPlayerBackground(value)}
+                label={t('options.transparentPlayerBackground')}
+                hint={t('options.transparentPlayerBackgroundDesc')}
+            />
             <button
                 type="button"
                 className="spw-chrome-btn"
                 data-spw-chrome="settings"
-                data-visible={chromeVisible && !open ? 'true' : 'false'}
+                data-visible={chromeAlwaysOn || (chromeVisible && !open) ? 'true' : 'false'}
+                /* v0.1.7: backdrop-filter layers are dropped by the colour-key host window, so the
+                 * chrome falls back to a flat background while the player page is transparent. */
+                data-flat={chromeAlwaysOn ? 'true' : 'false'}
                 aria-label={t('options.lyricsStyleSettings')}
                 title={t('options.lyricsStyleSettings')}
                 onClick={() => setOpen(true)}

@@ -86,6 +86,7 @@ stayed at the default palette — see `docs/verification-v0.1.2.md`.
 | `--assets <dir>` | – | extra static dir mapped to `https://spw-folia-assets.local/`. |
 | `--no-overlay` | overlay injected | skip the placeholder HUD script (automated tests). |
 | `--settings-dir <dir>` | – | settings-UI dist dir → mapped to `https://spw-folia-settings.local/` and its entry module script injected **after** `Shim.js`. |
+| `--no-transparency` | off | force the opaque window even when the persisted settings ask for a transparent player page (diagnostics / regression runs). |
 | `--settings-entry <file>` | `settings-ui.js` | settings-UI entry filename inside `--settings-dir`. |
 | `--force-dsf <n>` | follow Windows | pass `--force-device-scale-factor=n` to WebView2 (CSS px = device px at 1; dev/DPI experiments). |
 | `--bundle-version <text>` | – | echoed in the page `hello` message. |
@@ -168,6 +169,25 @@ disabled (`--autoplay-policy=no-user-gesture-required --disable-background-timer
 --disable-renderer-backgrounding --disable-backgrounding-occluded-windows
 --disable-features=CalculateNativeWinOcclusion`), context menus/status bar/swipe/zoom off.
 
+### Player-page transparency (v0.1.7)
+
+`settings.transparentPlayerBackground` (toggled from the bottom-right sliders button of the injected chrome)
+turns the host window into a colour-key layered window: `BackColor` is set to `rgb(255,0,255)`, `TransparencyKey`
+to the same colour and `WebView2.DefaultBackgroundColor` to `Color.Transparent`; turning it off restores
+`BackColor=Black` / no key / opaque `DefaultBackgroundColor`. The flag is read from the settings JSON on three
+paths — constructor (`--dev-settings`), stdin `settings`, and the page's `{"type":"settings"}` — so the window
+follows the UI toggle immediately and plugins only have to persist the tree. Page side, the settings model emits
+`background.transparent`, which makes Folia skip its background renderer; the document background is already
+transparent in OBS mode.
+
+Two colour-key composition side effects are compensated: (1) a keyed window is fully click-through (verified with
+clicks on the gold ring hitting the window below), so a global hotkey escape is registered while transparency is
+active — **Ctrl+Alt+B**, falling back to Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B — which turns transparency off
+and calls `window.__spwFoliaSetTransparent(false)` so the page switch and the persisted tree stay in sync;
+(2) `backdrop-filter` layers are not drawn by the keyed composition, so the chrome and its panel switch to a flat
+background via `data-flat='true'`. Logs: `transparency mode=on|off`, `transparency hotkey=registered|off|unregistered|failed`.
+Details and limitations: `docs/live-transparency.md`; evidence: `docs/verification-v0.1.7.md`.
+
 ---
 
 ## 4. How the Kotlin plugin spawns it
@@ -242,8 +262,9 @@ cost is dominated by WebView2 bring-up (~0.5 s), not our code.
 
 Known limitations: beat FX not available (see `docs/webview-spike.md` §6); loopback is
 post-volume so lowering the system volume lowers visual reactivity (expected Folia behaviour);
-AGC off by default; multi-monitor selection not implemented (primary only); transparency and
-click-through are not wired (not needed for fullscreen v1); one WebView2 profile per user data dir;
+AGC off by default; multi-monitor selection not implemented (primary only); player-page transparency is a
+colour-key layered window (v0.1.7, `docs/live-transparency.md`), therefore mouse input passes through and
+`backdrop-filter` is dropped while it is on; one WebView2 profile per user data dir;
 the page must be 100 % offline (no external network requests — verified).
 
 ---

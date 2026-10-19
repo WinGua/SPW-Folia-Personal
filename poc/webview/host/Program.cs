@@ -62,6 +62,7 @@ namespace SpwFolia
         public string BundleVersion;
         public bool OpenSettings;   // first run: open the injected settings UI once it is ready
         public double ExitAfterFps; // diagnostic: close when a page fps sample >= this
+        public bool NoTransparency; // v0.1.7: force the window opaque (diagnostics/kill switch)
 
         public static CliArgs Parse(string[] argv)
         {
@@ -103,6 +104,7 @@ namespace SpwFolia
                     case "--no-demo": a.DemoConfig = false; break;
                     case "--bundle-version": a.BundleVersion = Next(argv, ref i); break;
                     case "--open-settings": a.OpenSettings = true; break;
+                    case "--no-transparency": a.NoTransparency = true; break;
                     case "--exit-after-fps": a.ExitAfterFps = ParseInt(Next(argv, ref i), 0); break;
                     case "--width": a.WindowWidth = ParseInt(Next(argv, ref i), 1280); break;
                     case "--height": a.WindowHeight = ParseInt(Next(argv, ref i), 720); break;

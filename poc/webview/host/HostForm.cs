@@ -76,6 +76,12 @@ namespace SpwFolia
         // host-side settings (protocol §2 `settings` out / §1 `settings` in)
         private string settingsRaw;
 
+        // v0.1.7 player-page transparent background: a colour-key window (the desktop shows through
+        // wherever the page paints transparent). Driven by settings.transparentPlayerBackground.
+        private bool transparencyTarget;
+        private bool transparencyActive;
+        private static readonly Color TransparencyKeyColor = Color.FromArgb(255, 0, 255);
+
         private long totalFramesPosted;
         private double lastFps;
         private long lastAudioLogAt;
@@ -95,6 +101,22 @@ namespace SpwFolia
         private long lastCursorMoveAt = -1;
         private bool cursorVisible = true;
         private bool settingsOverlayOpen;
+
+        // v0.1.7 transparent player background: the colour-key window is click-through, so an opaque
+        // window comes back through this global hotkey instead of a mouse click. Ctrl+Alt+B is the
+        // advertised combo ("B" for background); the rest are fallbacks for apps that already own it.
+        private const int TransparencyHotkeyId = 0x5357;
+        private const uint ModAlt = 0x0001;
+        private const uint ModControl = 0x0002;
+        private static readonly uint[] HotkeyMods = { ModControl | ModAlt, ModControl | ModAlt, ModControl | ModAlt, ModControl | ModAlt | 0x0004 };
+        private static readonly uint[] HotkeyVks = { 0x42 /* B */, 0x59 /* Y */, 0x50 /* P */, 0x42 /* B */ };
+        private bool transparencyHotkeyRegistered;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
         public int ExitCode { get { return exitCode; } }
 
@@ -153,6 +175,116 @@ namespace SpwFolia
                 }
                 catch (Exception ex) { log.Error("dev-settings", ex); }
             }
+
+            // v0.1.7: apply the persisted player-page transparency before the window is shown, so a
+            // relaunch with the switch on comes up transparent instead of flashing an opaque frame.
+            ApplyTransparencyFromSettings();
+        }
+
+        // ------------------------------------------------------------ v0.1.7: player transparency
+
+        /// <summary>
+        /// Player-page transparent background (Folia's `transparentPlayerBackground`): the page paints
+        /// its own background fully transparent and the host keys that colour out of the window, so the
+        /// desktop (or anything behind the window) really shows through. Verified with
+        /// repro/transparency-runtime-probe.cs — the key can be toggled on a live WebView2 surface.
+        /// </summary>
+        private void ApplyTransparencyFromSettings()
+        {
+            bool on = false;
+            if (!string.IsNullOrEmpty(settingsRaw))
+            {
+                try
+                {
+                    string raw = JsonUtil.ExtractRawValue(settingsRaw, "transparentPlayerBackground");
+                    on = raw != null && raw.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+                }
+                catch (Exception ex) { log.Error("transparency-parse", ex); }
+            }
+            if (args.NoTransparency) on = false;
+            if (on == transparencyTarget) return;
+            transparencyTarget = on;
+            if (IsHandleCreated) SafeBeginInvoke(delegate { SetTransparency(on); });
+            else SetTransparency(on);
+        }
+
+        private void SetTransparency(bool on)
+        {
+            if (on == transparencyActive) return;
+            try
+            {
+                if (on)
+                {
+                    TransparencyKey = Color.Empty;
+                    BackColor = TransparencyKeyColor;
+                    TransparencyKey = TransparencyKeyColor;
+                    webView.DefaultBackgroundColor = Color.Transparent;
+                }
+                else
+                {
+                    // Clear the key first, otherwise the window flashes magenta while going opaque.
+                    BackColor = Color.Black;
+                    TransparencyKey = Color.Empty;
+                    webView.DefaultBackgroundColor = Color.Black;
+                }
+                transparencyActive = on;
+                EnsureTransparencyHotkey();
+                log.Log("info", "transparency mode=" + (on ? "on" : "off"));
+            }
+            catch (Exception ex) { log.Error("transparency", ex); }
+        }
+
+        private void EnsureTransparencyHotkey()
+        {
+            if (!IsHandleCreated) return;
+            if (transparencyActive && !transparencyHotkeyRegistered)
+            {
+                for (int i = 0; i < HotkeyVks.Length && !transparencyHotkeyRegistered; i++)
+                {
+                    transparencyHotkeyRegistered = RegisterHotKey(Handle, TransparencyHotkeyId, HotkeyMods[i], HotkeyVks[i]);
+                    if (transparencyHotkeyRegistered)
+                    {
+                        log.Log("info", "transparency hotkey=registered mods=0x" + HotkeyMods[i].ToString("X")
+                            + " vk=0x" + HotkeyVks[i].ToString("X"));
+                    }
+                }
+                if (!transparencyHotkeyRegistered) log.Log("info", "transparency hotkey=failed");
+            }
+            else if (!transparencyActive && transparencyHotkeyRegistered)
+            {
+                UnregisterHotKey(Handle, TransparencyHotkeyId);
+                transparencyHotkeyRegistered = false;
+                log.Log("info", "transparency hotkey=unregistered");
+            }
+        }
+
+        /// <summary>
+        /// A colour-key layered window is click-through: once the player background is transparent the
+        /// user can no longer click the page, so the host registers a global hotkey as the way back to
+        /// an opaque window. The page is told about it so the setting (and its persistence) stays in sync.
+        /// </summary>
+        protected override void WndProc(ref Message m)
+        {
+            const int WM_HOTKEY = 0x0312;
+            if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == TransparencyHotkeyId)
+            {
+                log.Log("info", "transparency hotkey=off");
+                SetTransparency(false);
+                SyncPageTransparency(false);
+                return;
+            }
+            base.WndProc(ref m);
+        }
+
+        private void SyncPageTransparency(bool on)
+        {
+            try
+            {
+                if (webView == null || webView.CoreWebView2 == null) return;
+                webView.CoreWebView2.ExecuteScriptAsync(
+                    "window.__spwFoliaSetTransparent && window.__spwFoliaSetTransparent(" + (on ? "true" : "false") + ");");
+            }
+            catch (Exception ex) { log.Error("transparency-sync-page", ex); }
         }
 
         // ------------------------------------------------------------ task-9: window geometry/DPI
@@ -161,6 +293,7 @@ namespace SpwFolia
         {
             base.OnHandleCreated(e);
             ApplyWindowGeometry("handle-created");
+            EnsureTransparencyHotkey();
         }
 
         protected override void OnShown(EventArgs e)
@@ -335,6 +468,11 @@ namespace SpwFolia
             ShowCursorNow();
             timer.Stop();
             exitTimer.Stop();
+            if (transparencyHotkeyRegistered)
+            {
+                UnregisterHotKey(Handle, TransparencyHotkeyId);
+                transparencyHotkeyRegistered = false;
+            }
             SendClosed();
             log.Log("info", "host-exit code=" + exitCode + " reason=" + closeReason
                 + " framesPosted=" + totalFramesPosted
@@ -554,6 +692,7 @@ namespace SpwFolia
                 if (settingsValue != null)
                 {
                     settingsRaw = settingsValue;
+                    ApplyTransparencyFromSettings();
                     log.WriteLine("{\"t\":\"settings\",\"settings\":" + settingsValue + "}");
                 }
             }
@@ -828,6 +967,7 @@ namespace SpwFolia
                 if (settingsValue != null)
                 {
                     settingsRaw = settingsValue;
+                    ApplyTransparencyFromSettings();
                     SafeBeginInvoke(SendSettingsToPage);
                 }
             }

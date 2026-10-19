@@ -149,3 +149,147 @@ body.spw-injected {
     transform-origin: 50% 55%;
     will-change: transform;
 }
+
+/* v0.1.7: player-page transparent background — round sliders button in the bottom-right corner and
+ * the switch panel it opens (reference layout: screenshot 1 row, screenshot 2 corner button). */
+.spw-player-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483001;
+    /* mount.tsx root is pointer-events:none; the panel/button re-enable their own hit-testing. */
+    pointer-events: none;
+}
+
+.spw-chrome-btn--player {
+    top: auto;
+    right: 32px;
+    /* clear of the auto-hidden taskbar strip at the very bottom of a fullscreen window */
+    bottom: 56px;
+    background: rgba(24, 21, 18, 0.55);
+    border-color: rgba(214, 168, 84, 0.75);
+    box-shadow: 0 0 0 2px rgba(214, 168, 84, 0.85), 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.spw-chrome-btn--player:hover {
+    background: rgba(40, 34, 26, 0.72);
+}
+
+.spw-chrome-btn--player[data-visible='false'] {
+    transform: translateY(4px) scale(0.96);
+}
+
+.spw-player-bg-panel {
+    position: fixed;
+    right: 32px;
+    bottom: 108px;
+    width: 300px;
+    padding: 6px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(18, 18, 20, 0.92);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    transform-origin: 100% 100%;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.spw-player-bg-panel[data-open='true'] {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.spw-player-bg-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 12px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #f4f4f5;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+}
+
+.spw-player-bg-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.spw-player-bg-row:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.6);
+    outline-offset: 2px;
+}
+
+.spw-player-bg-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.spw-player-bg-label {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+.spw-player-bg-hint {
+    font-size: 12px;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.spw-switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 24px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.18);
+    transition: background 0.16s ease;
+}
+
+.spw-switch[data-on='true'] {
+    background: #d8b072;
+}
+
+.spw-switch-knob {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    transition: transform 0.16s ease;
+}
+
+.spw-switch[data-on='true'] .spw-switch-knob {
+    transform: translateX(16px);
+}
+
+.spw-player-bg-note {
+    margin: 0;
+    padding: 8px 12px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.42);
+}
+
+/* v0.1.7: the colour-key host window drops backdrop-filter layers, so while the player page is
+ * transparent the chrome and its panel paint a flat translucent background instead of blurring. */
+.spw-chrome-btn[data-flat='true'],
+.spw-player-bg[data-flat='true'] .spw-chrome-btn,
+.spw-player-bg[data-flat='true'] .spw-player-bg-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}

@@ -181,6 +181,11 @@ interface SettingsState {
     setStyleTuning: (mode: StyleMode, patch: Record<string, unknown>) => void;
     resetStyleTuning: (mode: StyleMode) => void;
 
+    /** Folia player-page transparent background: the host window goes colour-key transparent so the
+     *  desktop shows through (v0.1.7). */
+    transparentPlayerBackground: boolean;
+    setTransparentPlayerBackground: (value: boolean) => void;
+
     backgroundMode: BackgroundMode;
     setBackgroundMode: (mode: BackgroundMode) => void;
     backgroundTunings: Record<'monet' | 'nomand' | 'latent' | 'sora', Record<string, unknown>>;
@@ -242,6 +247,9 @@ export const useSettingsStore = create<SettingsState>(set => ({
             styleTunings: { ...state.styleTunings, [mode]: { ...STYLE_TUNING_DEFAULTS[mode] } },
         })),
 
+    transparentPlayerBackground: false,
+    setTransparentPlayerBackground: transparentPlayerBackground => set({ transparentPlayerBackground }),
+
     backgroundMode: 'latent',
     setBackgroundMode: backgroundMode => set({ backgroundMode }),
     backgroundTunings: JSON.parse(JSON.stringify(BACKGROUND_TUNING_DEFAULTS)),
@@ -293,6 +301,7 @@ export interface SettingsSnapshot {
     previewPlaceholderId: PreviewPlaceholderId;
     lyricMotion: number;
     textureResolution: number;
+    transparentPlayerBackground: boolean;
 }
 
 export const snapshotFromState = (state: SettingsState): SettingsSnapshot => ({
@@ -308,6 +317,7 @@ export const snapshotFromState = (state: SettingsState): SettingsSnapshot => ({
     previewPlaceholderId: state.previewPlaceholderId,
     lyricMotion: state.lyricMotion,
     textureResolution: state.textureResolution,
+    transparentPlayerBackground: state.transparentPlayerBackground,
 });
 
 /** Hydrates the store from a snapshot the plugin persisted (unknown/missing keys keep defaults). */
@@ -326,6 +336,7 @@ export const applySnapshot = (snapshot: Partial<SettingsSnapshot> | null | undef
         previewPlaceholderId: clean(snapshot.previewPlaceholderId, state.previewPlaceholderId),
         lyricMotion: clean(snapshot.lyricMotion, state.lyricMotion),
         textureResolution: clean(snapshot.textureResolution, state.textureResolution),
+        transparentPlayerBackground: clean(snapshot.transparentPlayerBackground, state.transparentPlayerBackground),
     }));
 };
 

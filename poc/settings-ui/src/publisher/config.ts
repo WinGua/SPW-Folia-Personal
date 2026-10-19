@@ -119,6 +119,9 @@ export const buildBackgroundConfig = (settings: SettingsSnapshot) => {
     });
     return {
         mode: settings.backgroundMode,
+        // v0.1.7: the player page runs the real renderer, so transparency is a real window property
+        // (host colour-key) plus `background.transparent` for Folia's own background renderer.
+        transparent: settings.transparentPlayerBackground === true,
         common: { ...DEFAULT_COMMON_BACKGROUND, ...settings.commonBackground },
         latent: tuning('latent'),
         monet: tuning('monet'),
