@@ -114,6 +114,35 @@ RESULT: PASS (no dialog, helper still running)
 新二进制在测试全程 0 条 error 日志（旧二进制也没有 —— 因为旧版根本没装这个钩子，
 这正是原始故障「日志里什么都看不到、只有一张弹窗截图」的原因）。
 
+### 6. 发布产物真机验收（本机真实 SPW 安装，2026-10-19 22:36）
+
+把 GitHub 发布的 `spw-folia-0.1.10.spmod` 解包到
+`%APPDATA%\Salt Player for Windows\workshop\plugins\spw-folia-0.1.10`，重启 SPW，
+日志确认 `start: id=dev.spw.folia version=0.1.10 spw=1.19.0`。打开 Folia 窗口、
+点金色圆钮 →「播放页透明背景」，日志出现
+`transparency mode=on` / `transparency mouse=catcher shown bounds={X=0,Y=0,Width=3200,Height=2000}`。
+随后向真实捕获窗口（`hwnd=0x110A4A`，`exstyle=0x08090088` = LAYERED|NOACTIVATE|TOOLWINDOW，
+`rect=(0,0,3200,2000)`）投递 v0.1.9 的致命消息
+`WM_MOUSEWHEEL wparam=0xFF880000`（delta -120，零扩展）：
+
+```
+post #1  WM_MOUSEWHEEL wparam=0xFF880000 (delta -120) -> True
+helper alive after 1 wheel-down post(s): True
+catcher responsive: True
+new top-level windows: 0
+helper error lines: none
+RESULT: PASS
+```
+
+再连发 20 次（模拟用户连续向下滚动）同样 PASS：辅助进程 pid 20700 存活、捕获窗口仍响应
+`WM_NULL`、无新顶层窗口（即无「Microsoft .NET Framework」弹窗）、插件日志 0 条 error。
+最后 Ctrl+Alt+B 退出透明（`transparency exit source=hotkey` → `mode=off` → `catcher hidden`），
+ESC 关窗，辅助进程正常退出（`host-exit code=0 reason=user framesPosted=3684`，无残留进程）。
+
+脚本：`tmp-verify/live-wheel/livewheel-installed.py`（本机物理坐标在
+`tmp-verify/live-wheel/enable-transparency.py` 里），原始输出
+`tmp-verify/live-wheel/installed-0.1.10.txt`。
+
 ## 修复内容
 
 `poc/webview/host/HostForm.cs`

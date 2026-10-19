@@ -33,6 +33,9 @@ v0.1.10 修掉这个转换（改为 `unchecked((int)x.ToInt64())`），同时修
   「Microsoft .NET Framework」对话框（新顶层窗口），新版进程存活、窗口响应正常、0 条错误日志。
 - **参数形状确认**（`tmp-verify/live-wheel/paramprobe.exe`）：实测该消息到达 `WndProc` 时
   `wparam64=0x00000000FF880000`、`wpToInt32=OverflowException`，与崩溃前提完全一致。
+- **发布产物真机验收**：把本页发布的 `.spmod` 解包进真实 SPW 安装（`version=0.1.10`），
+  打开透明模式后向真实捕获窗口投递 `WM_MOUSEWHEEL wparam=0xFF880000`（1 次 + 20 次连发）：
+  辅助进程存活、捕获窗口仍响应、0 个新顶层窗口、0 条 error 日志；退出透明与关窗均正常（`host-exit code=0`）。
 - 细节见 [verification-v0.1.10.md](verification-v0.1.10.md)。
 
 ## 产物
