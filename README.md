@@ -1,161 +1,156 @@
-# spw-folia — Folia lyric visualizer for Salt Player for Windows
+# spw-folia — Salt Player for Windows 的 Folia 歌词可视化插件
 
-Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualization system into
-**Salt Player for Windows (SPW)** as a creative-workshop plugin: a `Folia` entry in the mini-player
-**更多** menu opens a borderless fullscreen Folia mode powered by Folia's **own** rendering code
-(all 14 lyric styles), driven by the music SPW is playing.
+把 [Folia](https://github.com/chthollyphile/folia-major) 的歌词可视化系统以创意工坊插件形式带进
+**Salt Player for Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目会打开无边框全屏 Folia
+模式，直接运行 Folia **自己的**渲染代码（全部 14 种歌词样式），并由 SPW 正在播放的音乐驱动。
 
-> Not affiliated with Folia or Salt Player. Folia is AGPL-3.0; this plugin is a derivative work and
-> is licensed AGPL-3.0 too (see [LICENSE](LICENSE) and [docs/licensing.md](docs/licensing.md)).
+> 与 Folia、Salt Player 均无隶属关系。Folia 采用 AGPL-3.0 许可；本插件是其衍生作品，同样以
+> AGPL-3.0 发布（见 [LICENSE](LICENSE) 与 [docs/licensing.md](docs/licensing.md)）。
 
-![Folia entry in the SPW mini-player 更多 menu](docs/images/menu-folia.png)
+**中文** | [English](README.en.md)
 
-![Folia fullscreen mode with the injected Folia settings page](docs/images/settings-ui.jpg)
+![SPW 迷你播放器「更多」菜单中的 Folia 条目](docs/images/menu-folia.png)
 
-<p align="center"><img src="docs/images/fullscreen-chrome.jpg" width="88%" alt="Folia fullscreen visualizer with the ⚙ Folia settings button"></p>
+![Folia 全屏模式与注入的 Folia 设置页面](docs/images/settings-ui.jpg)
 
-## Features
+<p align="center"><img src="docs/images/fullscreen-chrome.jpg" width="88%" alt="Folia 全屏可视化器与右上角 ⚙ 设置按钮"></p>
 
-- **Real Folia renderer, not a port** — the plugin hosts Folia 0.7.21's production
-  OBS-browser-source bundle in WebView2; every style is Folia's original code, so motion, glow,
-  word timing, backgrounds and transitions match Folia pixel for pixel.
-- **All 14 lyric styles**: 商籁 (sonnet) · 凝彩 (tempera) · 绘光 (lumiere) · 流光 (classic) ·
+## 功能
+
+- **直接运行真正的 Folia，而非移植** — 插件在 WebView2 中承载 Folia 0.7.21 的生产级
+  OBS 浏览器源产物；每种样式都是 Folia 原始代码，因此动态、辉光、逐字时间轴、背景与转场都与
+  Folia 像素级一致。
+- **全部 14 种歌词样式**：商籁 (sonnet) · 凝彩 (tempera) · 绘光 (lumiere) · 流光 (classic) ·
   心象 (cadenza) · 云阶 (partita) · 浮名 (fume) · 倾诉 (tilt) · 回环 (claddagh) · 莫奈 (monet) ·
-  时计 (pendolo) · 群唱 (cappella) · 镜台 (diorama) · 静止 (still).
-- **Folia's settings page, 1:1** — the 「歌词样式」 window (tabs 歌词动画 / 背景 / 字体 / 字幕,
-  14-style live grid, 默认 reset, 智能动感模式, 推镜裂光 强度, 纹理分辨率, 镜头运动强度,
-  文字动势, per-style tunings) reusing Folia's own React components.
-- **Synced to SPW playback** — track, lyrics timeline (word-level cells), subtitle translation,
-  play/pause/seek/rate are bridged from SPW's playback API plus a smooth interpolated timeline.
-- **Audio-reactive** — WASAPI system-loopback capture with Folia-compatible 1024-bin spectrum and
-  5-band gamma-mapped levels (power/bass/lowMid/mid/vocal/treble), computed inside the native helper.
-- **No HTTP server, no network** — the helper maps a local bundle to a virtual https host; a tiny
-  injected shim feeds Folia's EventSource protocol directly from the plugin over stdin/stdout.
-- **AGPL-3.0 clean source** — plugin (Kotlin), helper (C#), settings UI (React/TS) and packaging are
-  all in this repository.
+  时计 (pendolo) · 群唱 (cappella) · 镜台 (diorama) · 静止 (still)。
+- **Folia 设置页 1:1 还原** —「歌词样式」窗口（歌词动画 / 背景 / 字体 / 字幕 四个标签页、
+  14 样式实时网格、默认 重置、智能动感模式、推镜裂光强度、纹理分辨率、镜头运动强度、文字动势、
+  各样式专属调节项），复用 Folia 自己的 React 组件。
+- **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自
+  SPW 播放 API 加一条平滑插值时间轴。
+- **音频响应** — 在原生辅助进程内完成 WASAPI 系统回环采集，输出与 Folia 兼容的 1024-bin 频谱和
+  5 段 gamma 映射电平（power/bass/lowMid/mid/vocal/treble）。
+- **无 HTTP 服务、无网络** — 辅助进程把本地 bundle 映射到虚拟 https 主机，一个极小的注入 shim
+  通过 stdin/stdout 直接把数据喂给 Folia 的 EventSource 协议。
+- **AGPL-3.0 完整源码** — 插件（Kotlin）、辅助进程（C#）、设置 UI（React/TS）与打包脚本
+  全部在本仓库中。
 
-### v1 limitations
+### v1 限制
 
-- **智能动感模式 (Smart Beat) beat effects are not included in v1**: the Folia OBS surface exposes no
-  beat events, and Folia's beat models (`beat_this` / `htdemucs`, ~133 MB) run in Folia's Electron main
-  process and are not part of its web bundle. With smart beat off (Folia's default) every style renders
-  identically to Folia. The Folia settings UI is kept intact, so the switch is visible but has no
-  effect in v1.
-- **Windows only** (the helper uses WebView2 + Windows WASAPI).
-- **Pinned to Salt Player for Windows 1.19.0** — the menu hook targets one host build
-  (SPW's internal names are obfuscated per release); the plugin refuses to install the hook on other
-  versions. See [docs/hook-target.md](docs/hook-target.md).
-- No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
+- **智能动感模式（Smart Beat）的节拍特效未包含在 v1**：Folia OBS 接口不暴露节拍事件，而 Folia 的
+  节拍模型（`beat_this` / `htdemucs`，约 133 MB）运行在 Folia 的 Electron 主进程里，不在其 web
+  bundle 中。关闭智能动感时（Folia 的默认值），所有样式的渲染与 Folia 完全一致。设置界面原样保留，
+  因此该开关可见，但在 v1 中没有实际效果。
+- **仅支持 Windows**（辅助进程依赖 WebView2 + Windows WASAPI）。
+- **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆
+  变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
+- 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
 
-## What's new in v0.1.1
+## v0.1.1 更新内容
 
-- **The Folia menu entry now looks like a first-class host item** — same row layout as
-  播放速度 / 桌面歌词 / 歌词翻译 / 释放音频引擎: 19 dp sparkle icon tinted with the host content colour,
-  14 sp label, identical spacing and disabled alpha.
-- **Cursor auto-hide fixed** — in fullscreen the pointer hides after 2.5 s of inactivity, reappears on
-  movement, and is forced visible while the 歌词样式 overlay is open. (v0.1.0 hid the pointer permanently,
-  so the ⚙ gear could not be clicked.)
-- **Settings overlay reliability** — fixed a page↔host UI-state echo loop that could leave the panel
-  blank/flapping; the panel now scrolls correctly and reopens instantly.
+- **更多菜单条目与宿主原生项风格一致** — 与 播放速度 / 桌面歌词 / 歌词翻译 / 释放音频引擎
+  相同的行布局：19 dp 星芒图标（使用宿主内容色）、14 sp 文字、相同间距与禁用透明度。
+- **修复光标自动隐藏** — 全屏模式中鼠标静止 2.5 秒后隐藏、移动即恢复，歌词样式面板打开期间强制
+  显示。（v0.1.0 会永久隐藏光标，导致右上角 ⚙ 无法点击。）
+- **设置面板稳定性** — 修复页面↔宿主 UI 状态回环，该问题会导致面板空白/闪烁；现在滚动正确、秒开。
 
-## Verified end-to-end
+## 端到端验证
 
-The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS channel) on Windows 11:
+发布产物已在 Windows 11 上的真实 Salt Player for Windows 1.19.0（MS 渠道）中验证：
 
-| check | evidence |
+| 检查项 | 证据 |
 | --- | --- |
-| **Folia** item appears in the mini-player 更多 flyout and opens the fullscreen renderer | [docs/plugin-integration.md](docs/plugin-integration.md) §1, `poc/hook/shots/task7-*` |
-| Fullscreen 3200x2000 at 175% DPI, page 1776x1110 dpr1, 3 canvases, 110-120 fps; stable 16-min soak (66-67.5 MB working set) | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
-| Playhead + word-level lyrics advance from SPW playback (100 ms interpolated timeline); pause/resume and seek follow | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
-| Real mouse input: hover ⚙ opens the 歌词样式 overlay, ← returns to the renderer, ESC closes (exit 0) | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
-| **Folia** item matches host menu typography/sparkle icon; cursor hides when idle, returns on move, stays visible with settings open, real ⚙ click opens the panel (v0.1.1 regression) | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/plugin-integration.md](docs/plugin-integration.md) §7 |
-| Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
-| All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
-| Full acceptance matrix (track change / seek / pause / no-lyrics / lifecycle / persistence / soak) | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
+| 迷你播放器「更多」浮层出现 **Folia** 条目，点击后打开全屏渲染器 | [docs/plugin-integration.md](docs/plugin-integration.md) §1, `poc/hook/shots/task7-*` |
+| 全屏 3200x2000 @175% DPI，页面 1776x1110 dpr1，3 个 canvas，110-120 fps；16 分钟长稳测试稳定（66-67.5 MB 工作集） | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
+| 播放进度 + 逐字歌词随 SPW 播放推进（100 ms 插值时间轴）；暂停/继续与跳转跟随 | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
+| 真实鼠标输入：悬停 ⚙ 打开「歌词样式」浮层，← 返回渲染器，ESC 关闭（exit 0） | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
+| **Folia** 条目与宿主菜单字体/星芒图标一致；光标空闲隐藏、移动恢复、设置打开时常显，真实点击 ⚙ 可打开面板（v0.1.1 回归） | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/plugin-integration.md](docs/plugin-integration.md) §7 |
+| 设置/样式在 SPW 重启后保留；禁用插件后恢复 4 项菜单；5 次开/关与杀掉 SPW 后无残留辅助进程 | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
+| 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
+| 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
-<p align="center"><img src="docs/images/style-grid.png" width="82%" alt="All 14 Folia lyric styles in the settings window"></p>
+<p align="center"><img src="docs/images/style-grid.png" width="82%" alt="设置窗口中的全部 14 种 Folia 歌词样式"></p>
 
-## Install
+## 安装
 
-Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
-Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
+要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
+Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. Download `spw-folia-0.1.1.spmod` from the [Releases](../../releases) page (Windows x64).
-2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
-   **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
-3. Restart SPW if the plugin manager asks for it.
-4. Play a song, open the mini player's **更多** (…) menu → **Folia**.
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.1.spmod`（Windows x64）。
+2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
+   **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
+3. 若插件管理器提示需要，重启 SPW。
+4. 播放歌曲，打开迷你播放器的 **更多**（…）菜单 → **Folia**。
 
-The first run opens Folia's settings window; afterwards the visualizer opens directly (⚙ top-right
-opens settings; ESC closes settings first, then the window). Settings are stored in SPW's plugin
-data directory.
+首次运行会打开 Folia 设置窗口；之后会直接打开可视化器（右上角 ⚙ 打开设置；ESC 先关设置、再关窗口）。
+设置保存在 SPW 的插件数据目录中。
 
-## Build from source
+## 从源码构建
 
-Toolchain: JDK 25, Gradle 9.8 (wrapper included), Kotlin 2.4.20, Node 24 + pnpm (settings UI),
-Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK and no Android SDK.
+工具链：JDK 25、Gradle 9.8（含 wrapper）、Kotlin 2.4.20、Node 24 + pnpm（设置 UI）、
+Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。无需 .NET SDK，无需 Android SDK。
 
 ```bat
-:: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
+:: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
 gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.1.spmod
 
-:: 2) native helper (C# + WebView2)
+:: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
 bash build.sh               :: -> build/spw-folia-host.exe (+ WebView2 dlls)
 
-:: 3) settings UI (React)
+:: 3) 设置 UI（React）
 cd ..\..\settings-ui
 pnpm install && pnpm build  :: -> dist/settings-ui.js
 
-:: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
-bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
+:: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
+bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
     --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.1.spmod ^
     --staging packaging --out dist --name spw-folia-0.1.1.spmod
-::    see docs/release.md for the full, scripted assembly and local-install test loop.
+::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 
-Project layout:
+项目结构：
 
 ```
-spw-folia/       Kotlin plugin (hook, playback bridge, timeline, config, helper process manager)
-poc/webview/     native helper sources (C# WinForms + WebView2) and dev server/driver
-poc/settings-ui/ Folia settings window (React island reusing Folia's components)
-poc/audio/       WASAPI loopback analyzer (C#) + timeline notes
-packaging/       staged web bundle + native payload + licenses + release docs
-docs/            architecture, protocol, host app, hook target, Folia spec, licensing
-research/        Folia style/settings research notes (AGPL; reference assets are not committed)
+spw-folia/       Kotlin 插件（hook、播放桥接、时间轴、配置、辅助进程管理）
+poc/webview/     原生辅助进程源码（C# WinForms + WebView2）与开发服务器/驱动
+poc/settings-ui/ Folia 设置窗口（复用 Folia 组件的 React island）
+poc/audio/       WASAPI 回环分析器（C#）+ 时间轴说明
+packaging/       暂存的 web bundle + 原生 payload + 许可证 + 发布文档
+docs/            架构、协议、宿主程序、hook 目标、Folia 规格、许可
+research/        Folia 样式/设置调研笔记（AGPL；参考素材不提交到仓库）
 ```
 
-## Architecture (short version)
+## 架构（简版）
 
 ```
 SPW (JVM)                                    spw-folia-host.exe (C#/WebView2)
 ┌──────────────────────────┐  stdin/stdout   ┌───────────────────────────────────┐
-│ spw-folia plugin         │  JSON-lines     │ borderless fullscreen window      │
-│  MenuHook (更多 → Folia) │ ──────────────▶ │  Folia OBS bundle (React)         │
-│  PlaybackBridge ────────▶│ state/lyrics/   │  injected EventSource shim        │
-│  Timeline (smooth pos)   │ track/settings  │  injected Folia settings UI       │
-│  ConfigStore             │ ◀────────────── │  WASAPI loopback → audio frames   │
+│ spw-folia 插件           │  JSON-lines     │ 无边框全屏窗口                    │
+│  MenuHook（更多 → Folia）│ ──────────────▶ │  Folia OBS bundle (React)         │
+│  PlaybackBridge ────────▶│ state/lyrics/   │  注入的 EventSource shim          │
+│  Timeline（平滑进度）    │ track/settings  │  注入的 Folia 设置 UI             │
+│  ConfigStore             │ ◀────────────── │  WASAPI 回环 → 音频帧             │
 └──────────────────────────┘ ready/closed/…  └───────────────────────────────────┘
 ```
 
-Details: [docs/architecture.md](docs/architecture.md) · wire protocol:
-[docs/protocol.md](docs/protocol.md) · native host: [docs/host-app.md](docs/host-app.md) ·
-Folia spec: [docs/folia-spec/](docs/folia-spec/) · licensing: [docs/licensing.md](docs/licensing.md).
+详见：[docs/architecture.md](docs/architecture.md) · 通信协议：
+[docs/protocol.md](docs/protocol.md) · 原生宿主：[docs/host-app.md](docs/host-app.md) ·
+Folia 规格：[docs/folia-spec/](docs/folia-spec/) · 许可：[docs/licensing.md](docs/licensing.md)。
 
-## Credits
+## 致谢
 
-- [Folia](https://github.com/chthollyphile/folia-major) by chthollyphile (AGPL-3.0) — the entire
-  visualizer, settings UI and web bundle are Folia's work (v0.7.21).
-- [Salt Player for Windows](https://saltplayer.com/) workshop plugin API by Moriafly.
-- [spw-island (Dynamic Lyrics Island for SPW)](https://github.com/gaboron/spw-island) — behavioral
-  reference only (GPL-3.0); no code copied.
-- Microsoft Edge WebView2 SDK, .NET Framework, Kotlin/Compose, React/Vite.
+- [Folia](https://github.com/chthollyphile/folia-major)，作者 chthollyphile（AGPL-3.0）——整个
+  可视化器、设置 UI 与 web bundle 都来自 Folia 的工作（v0.7.21）。
+- [Salt Player for Windows](https://saltplayer.com/) 创意工坊插件 API，作者 Moriafly。
+- [spw-island（Dynamic Lyrics Island for SPW）](https://github.com/gaboron/spw-island) ——
+  仅作为行为参考（GPL-3.0）；未复制任何代码。
+- Microsoft Edge WebView2 SDK、.NET Framework、Kotlin/Compose、React/Vite。
 
-## License
+## 许可
 
-AGPL-3.0-or-later. This repository contains derivative work of Folia and is distributed in the hope
-that it will be useful, but WITHOUT ANY WARRANTY. See [LICENSE](LICENSE),
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the source offer in [docs/licensing.md](docs/licensing.md).
+AGPL-3.0-or-later。本仓库包含 Folia 的衍生作品，分发时希望它有用，但不提供任何担保。见
+[LICENSE](LICENSE)、[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 以及
+[docs/licensing.md](docs/licensing.md) 中的源码提供说明。
