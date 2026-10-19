@@ -63,6 +63,17 @@
   齿轮（以及它们打开的面板/设置页）永远可点。也可以按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P /
   Ctrl+Alt+Shift+B）或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
 
+## v0.1.10 更新内容
+
+- **修复：透明模式下滚轮向下导致辅助进程崩溃** — v0.1.9 的输入捕获窗口用 `IntPtr.ToInt32()`
+  读消息参数；在 x64 上这是带溢出检查的窄化转换，而 Win32 把参数零扩展投递，滚轮向下
+  （delta `-120` ⇒ `WPARAM` 低 32 位 `0xFF88xxxx`，bit31 为 1）于是抛出
+  `OverflowException: 算术运算导致溢出`，弹出「Microsoft .NET Framework」对话框并退出。
+  现改为 `unchecked((int)x.ToInt64())`，并修正滚轮分支取错字段（坐标应取自 `LPARAM`、delta 取自 `WPARAM`）。
+- **未处理异常写进日志** — 辅助进程注册 `Application.ThreadException` 与
+  `AppDomain.UnhandledException`，今后 UI 线程异常会输出 `level=error` 协议行，不再只有一张弹窗截图。
+- 细节见 [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md)。
+
 ## v0.1.9 更新内容
 
 - **面板新增「鼠标穿透（操作桌面）」** — 右下角金色圆钮打开的面板里，第二行就是穿透开关（只有透明背景
@@ -187,6 +198,7 @@
 | v0.1.7：播放页透明背景（色键窗口真透明、桌面透出、左下浮标/ Ctrl+Alt+B 恢复不透明并同步页面开关、退出后再次开启正常、设置树持久化、ESC 退出、透明时 chrome 可见） | [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md) |
 | v0.1.8：切歌即换词（track/lyrics 相差 2 ms）、封面 0.2 s 缩图并 0.4 s 内到页面、无封面保留旧主题；透明窗口内鼠标可点（透明中点开关 → `mode=off` + catcher 隐藏） | [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md) |
 | v0.1.9：鼠标穿透开关（`passthrough=on rects=3` → 点桌面 `passthrough=click at=1600,560` → catcher 恢复）、穿透下圆钮/齿轮/设置页返回键可点、热键退出后 `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
+| v0.1.10：滚轮向下崩溃修复（旧二进制投递 `WM_MOUSEWHEEL wparam=0xFF880000` 必抛 `OverflowException` 并弹出「Microsoft .NET Framework」对话框；新二进制反射级 15/15、真机级 0 弹窗、0 error 日志） | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -197,7 +209,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.9.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.10.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -214,7 +226,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.9.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.10.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -227,8 +239,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.9.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.9.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.10.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.10.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

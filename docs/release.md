@@ -444,3 +444,33 @@ reports its hot rectangles (`{"type":"hitbox","vw","vh","rects"}`); the invisibl
 the mouse only inside them and, while passthrough is on, hides itself / synthesises one real left click /
 restores after 220 ms for everything else. Leaving transparency resets `mousePassthrough`. See
 `docs/verification-v0.1.9.md`, `docs/live-transparency.md`, `docs/release-notes-v0.1.9.md`.
+
+### v0.1.10 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.10.spmod   13,145,163 B   1,941 entries
+sha256  4a90d09e95ea37449882f6b7507fcfa3d0ccdf72d86dbc969b26d6426cbcf951
+manifest: Plugin-Version 0.1.10 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.10.spmod 89,015 B
+        native/spw-folia-host.exe  : 128,000 B / sha256 c2c18431426f7cd6b5076d6de0a73256ca1e5842bfb3eae73105d3cadcfee6b4
+                                     (unchecked 64-bit message-param narrowing + crash logging)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,069,206 B / sha256 af99b31c0941cb2c42fe953ad2fcffb932ae086195eed18634541bea5fb15216)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.10.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.10.spmod
+```
+
+v0.1.10 fixes the crash reported on v0.1.9: scrolling the wheel **down** while the player was transparent
+killed the helper with `System.OverflowException: 算术运算导致溢出` in
+`TransparencyInputCatcher.Forward`. Cause: `m.WParam.ToInt32()` / `m.LParam.ToInt32()` are *checked*
+narrowing conversions on x64 .NET Framework, while Win32 delivers message parameters zero-extended in the
+low dword — wheel-down delta `-120` makes `WPARAM`'s low dword `0xFF88xxxx` (bit31 set) and the conversion
+threw. The fix reads `unchecked((int)x.ToInt64())` and also corrects the wheel branch (screen coordinates
+from `LPARAM`, delta from `WPARAM`, forwarded verbatim). `Program.Main` now registers
+`Application.ThreadException` + `AppDomain.UnhandledException` so a future UI-thread exception is logged as
+a `<level=error>` protocol line instead of only raising the Windows "unhandled exception" dialog. Diff
+against v0.1.9 is exactly 4 entries: `classes/META-INF/MANIFEST.MF`, `FoliaHostBridge.class`,
+`FoliaPlugin.class`, `native/spw-folia-host.exe`. See `docs/verification-v0.1.10.md`,
+`docs/live-transparency.md`, `docs/release-notes-v0.1.10.md`.

@@ -462,6 +462,18 @@ namespace SpwFolia
                 }
                 if (!string.IsNullOrEmpty(args.ScreenshotPath)) args.ScreenshotPath = Path.GetFullPath(args.ScreenshotPath);
                 if (!string.IsNullOrEmpty(args.FpsLogPath)) args.FpsLogPath = Path.GetFullPath(args.FpsLogPath);
+                // v0.1.10: an exception that escapes a WndProc used to surface as a modal Windows
+                // "unhandled exception" dialog and kill the host with no trace in our logs. Log it as a
+                // protocol line instead, then let the process die (the plugin respawns it).
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += delegate(object sender, System.Threading.ThreadExceptionEventArgs e)
+                {
+                    log.Error("ui-thread", e.Exception);
+                };
+                AppDomain.CurrentDomain.UnhandledException += delegate(object sender, UnhandledExceptionEventArgs e)
+                {
+                    log.Error("unhandled", e.ExceptionObject as Exception);
+                };
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 using (HostForm form = new HostForm(args, log))

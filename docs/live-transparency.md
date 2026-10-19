@@ -109,6 +109,25 @@ webView.DefaultBackgroundColor = Color.Black;
 
 透明时 chrome 常驻（`chromeAlwaysOn = transparentPlayerBackground === true`），并且 ESC 仍可关窗。
 
+## 4.5 v0.1.10：消息参数窄化崩溃修复
+
+- **症状**：v0.1.9 在透明模式下（捕获窗口存在时）**滚轮向下**会弹出
+  「Microsoft .NET Framework — 应用程序中发生了未经处理的异常 … 算术运算导致溢出。」然后辅助进程退出，
+  而 `spw-folia.log` / 宿主 stdout 里没有任何 error 行。
+- **根因**：`TransparencyInputCatcher.Forward()` 用 `m.WParam.ToInt32()` / `m.LParam.ToInt32()` 读参数。
+  x64 .NET Framework 上 `IntPtr.ToInt32()` 是**带溢出检查**的窄化转换，而 Win32 把消息参数零扩展投递：
+  `WM_MOUSEWHEEL` 的 `WPARAM` 低字是 delta，滚轮向下为 `-120`（`0xFF88`），低 dword 即 `0xFF88xxxx`
+  （bit31 = 1），于是 `ToInt32()` 抛 `OverflowException`。滚轮向上 `+120` 不触发。
+- **修复**：参数统一走 `unchecked((int)m.WParam.ToInt64())` / `unchecked((int)m.LParam.ToInt64())`
+  （`HostForm.cs:Forward`，热键 `WM_HOTKEY` 判断同样处理）。同时修正滚轮分支的字段混淆——光标坐标取自
+  `LPARAM`（已是屏幕坐标，无需 `PointToScreen`），delta/keyState 在 `WPARAM` 里，转发时 `WPARAM`/`LPARAM`
+  原样投递；`MakeLParam()` 两个半字都做 `& 0xFFFF`。
+- **可观测性**：`Program.Main` 里注册 `Application.SetUnhandledExceptionMode(CatchException)` +
+  `Application.ThreadException` + `AppDomain.CurrentDomain.UnhandledException`，异常改为
+  `<level=error>` 协议行（`ui-thread` / `unhandled` stage），随后进程照常结束由插件重启。
+- **验证**：反射级 15/15；真机级旧二进制必现 `Microsoft .NET Framework` 弹窗、新二进制 0 弹窗；
+  详见 `docs/verification-v0.1.10.md`。
+
 ## 5. 已知限制
 
 - 键色是纯洋红 `rgb(255,0,255)`：页面若恰好绘制该像素会被挖空（当前 Folia 主题/歌词不会产生该纯色；属于可接受风险）。

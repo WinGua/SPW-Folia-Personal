@@ -340,7 +340,10 @@ namespace SpwFolia
         protected override void WndProc(ref Message m)
         {
             const int WM_HOTKEY = 0x0312;
-            if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == TransparencyHotkeyId)
+            // unchecked: IntPtr.ToInt32() is a *checked* narrowing conversion on x64 .NET; a param whose
+            // low dword has bit 31 set would throw OverflowException out of WndProc (see
+            // TransparencyInputCatcher.Forward for the same fix and the v0.1.9 crash it caused).
+            if (m.Msg == WM_HOTKEY && unchecked((int)m.WParam.ToInt64()) == TransparencyHotkeyId)
             {
                 // Toggle: transparency is display-only (the layered colour-key window swallows the
                 // mouse), so the keyboard must be able to leave *and* re-enter the mode.
@@ -1780,18 +1783,23 @@ namespace SpwFolia
             int msg = m.Msg;
             if (msg != WM_MOUSEMOVE && msg != WM_LBUTTONDOWN && msg != WM_LBUTTONUP
                 && msg != WM_RBUTTONDOWN && msg != WM_RBUTTONUP && msg != WM_MOUSEWHEEL) return false;
+
+            // v0.1.10: never narrow a message parameter with IntPtr.ToInt32(). On x64 .NET that is a
+            // *checked* conversion and Win32 hands us WPARAM/LPARAM zero-extended to 64 bits, so any
+            // param whose low dword has bit 31 set (a negative mouse-wheel delta, a negative screen
+            // coordinate, ...) threw OverflowException straight out of WndProc - the v0.1.9 crash.
+            // ToInt64() + unchecked cast keeps the low 32 bits and cannot throw.
+            int lp = unchecked((int)m.LParam.ToInt64());
             NativePoint pt = new NativePoint();
-            int delta = 0;
             if (msg == WM_MOUSEWHEEL)
             {
-                int wp = m.WParam.ToInt32();
-                pt.X = (short)(wp & 0xFFFF);
-                pt.Y = (short)((wp >> 16) & 0xFFFF);
-                delta = (short)((m.LParam.ToInt32() >> 16) & 0xFFFF);
+                // WM_MOUSEWHEEL: LOWORD(wParam) = key state, HIWORD(wParam) = signed wheel delta,
+                // lParam = *screen* coordinates (not client, and not the delta).
+                pt.X = (short)(lp & 0xFFFF);
+                pt.Y = (short)((lp >> 16) & 0xFFFF);
             }
             else
             {
-                int lp = m.LParam.ToInt32();
                 pt.X = (short)(lp & 0xFFFF);
                 pt.Y = (short)((lp >> 16) & 0xFFFF);
                 Point screen = PointToScreen(new Point(pt.X, pt.Y));
@@ -1813,9 +1821,9 @@ namespace SpwFolia
             if (targetHandle == IntPtr.Zero) return false;
             if (msg == WM_MOUSEWHEEL)
             {
-                ScreenToClient(targetHandle, ref pt);
-                IntPtr wheelWParam = (IntPtr)((delta << 16) & unchecked((int)0xFFFF0000));
-                SendMessage(targetHandle, (uint)msg, wheelWParam, MakeLParam(pt.X, pt.Y));
+                // Forward verbatim: the page's input window expects the cursor position in screen
+                // coordinates and the wheel delta in HIWORD(wParam), exactly as Windows wrote them.
+                SendMessage(targetHandle, (uint)msg, m.WParam, m.LParam);
                 return true;
             }
             ScreenToClient(targetHandle, ref pt);
@@ -1824,6 +1832,7 @@ namespace SpwFolia
         }
         private static IntPtr MakeLParam(int x, int y)
         {
-            return (IntPtr)((y << 16) | (x & 0xFFFF));
+            // MAKELPARAM: mask both halves so negative/large values cannot corrupt the high word.
+            return (IntPtr)(((y & 0xFFFF) << 16) | (x & 0xFFFF));
         }
     }
