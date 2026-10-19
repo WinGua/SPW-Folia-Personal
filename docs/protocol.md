@@ -49,6 +49,7 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 - `{"type":"action","name":"close"|"reset"|"openDevTools"}`
 - `{"type":"log","level":"...","msg":"..."}`
 - `{"type":"beatDebug",...}`：可选
+- `{"type":"ui","settingsOpen":true|false}`：设置覆盖层开合状态（Shim 在捕获阶段拦截 `settingsUI` 特殊消息后发出；宿主据此在覆盖层打开期间强制显示光标，并保证 ESC 优先关闭覆盖层）
 
 ### 3.2 宿主 → 页面（`chrome.webview.postMessage`，页面侧由 Shim.js 统一接收）
 | type | 负载 | Shim 行为 |
@@ -107,12 +108,17 @@ window.__SPW_FOLIA__ = {
   - `isSettingsOpen(): boolean`、`openSettings()`、`closeSettings()`（页面内覆盖层状态，不重建页面）
   - 覆盖层打开时接管 ESC：capture 阶段 `keydown Escape` → closeSettings + `stopPropagation()`；
     覆盖层关闭时不拦截 ESC，交给宿主/Shim → `action close` → 宿主关窗。
+  - 覆盖层开合状态通过 `{"type":"ui","settingsOpen":bool}` 报告给宿主（v0.1.1 起为正式契约）。
 - 设置 UI 提供轻量 chrome（v1）：右上角 ⚙ 按钮（唤出设置；鼠标静止 2.5s 后与光标一起淡出）、
   覆盖层左上角 ← 返回按钮（关闭覆盖层）。样式贴近 Folia（半透明圆角、白字、hover 高亮）。
 - 宿主首次打开且无持久化设置时带 `--open-settings`（可在 hello 后发 `command open-settings`），
   之后直接显示视觉器；菜单再次点击时窗口已存在则置前（不重复开窗）。
 - 宿主收到 `command close-settings` 时调用 `__SPW_FOLIA__.ui.closeSettings()`；`open-settings` 相反。
 - 视觉器页面本身保持 OBS 模式（`isPlayerChromeHidden:true`），不注入任何 Folia 播放器 chrome。
+- 光标策略（v0.1.1 起）：全屏窗口内鼠标静止 2.5 s 后隐藏光标，移动即恢复；设置覆盖层打开期间强制显示；
+  关闭窗口后恢复系统光标。宿主把「`settingsOpen` OR 未空闲」作为目标可见性（幂等、状态变化时才写日志）。
+- 覆盖层内容在 `display:none` 下保持挂载（不重建 React 树），滚动条修复（`.st-window-scroll`）已包含在
+  v0.1.1 设置 UI 里；重新打开覆盖层是瞬时的。
 
 ## 8. 待定/风险
 - 智能动感节拍动画：依赖“注入脚本能否 `import()` 到 motionSignals 的 chunk 并 `.set()`”，webview-spike 探测中；不可用则 UI 保留开关但对动画降级说明。

@@ -96,3 +96,25 @@ helper：pid 12456，parent = SPW pid 7416，exe = 已安装 payload `…\dev.sp
 \* 采样 3/4 时 helper 处于最小化状态（viewport 记为窗口最小化尺寸 158x26），恢复全屏后（采样 5/8 起）viewport 回到 1776x1110；`errLines` 恒为基线 1（soak 开始前已存在），`closedLines` 恒为 0。结论：**无内存泄漏趋势（WS 稳定 66–67.5 MB）、无异常退出/错误增长、渲染持续 110–120 fps** → T8 PASS。
 
 备注：验收期间前两轮 soak 曾因**外部 agent 的真实 SendInput** 命中本插件 helper（ESC 关窗）或点击 SPW 菜单而中断（`soak-final.log` 首轮、pid 16044/16640 等），属共享桌面干扰、非产品缺陷；Lead 全局 HOLD（m02346）后由 `soak2.ps1` 完成干净 16 分钟 soak。
+
+---
+
+## v0.1.1 regression addendum (2026-10-19)
+
+Targets the v0.1.1 artifact (`dist/release/spw-folia-0.1.1.spmod`, sha256 `9c4d2069…`, 1,938 entries)
+installed in the release layout. Driver: `poc/hook/cursor-test.ps1` (DPI-aware real input; assertions are
+read from the helper's own log lines, not from the cross-process `GetCursorInfo` flag, which is
+unreliable) + `cycle-test.ps1` / `orphan-test.ps1`.
+
+| id | check | result | evidence |
+| --- | --- | --- | --- |
+| V1 | 更多 flyout item renders with host-compatible sparkle icon + typography (14 sp, #EBEEF1, 19 dp icon, 9.5/10.5/11 dp spacing) | PASS | `poc/hook/shots/menustyle1-crop-full.png`, `docs/images/menu-folia.png` |
+| V2 | cursor visible on movement (`cursor show` log) | PASS | helper `spw-folia.log` |
+| V3 | cursor hides after 2.5 s idle (`cursor hide overlay=closed idleMs=2501` log) | PASS | helper log |
+| V4 | cursor returns on the next movement (`cursor show` log) | PASS | helper log |
+| V5 | cursor stays visible while the 歌词样式 overlay is open and idle | PASS | helper log (no hide after `settings-ui state=open`) |
+| V6 | real mouse click on the settled ⚙ centre (screen 3118,79 @3200x2000/DSF1.8) opens the overlay (`settings-ui state=open`) | PASS | `poc/hook/shots/cursor-gear-click-0.png` |
+| V7 | ESC #1 closes the overlay only (helper alive), ESC #2 closes the window (exit 0) | PASS | helper log |
+| V8 | no orphan `spw-folia-host.exe` after SPW exits | PASS | `poc/hook/orphan-test.ps1` output |
+
+Result: **CURSOR-FIX PASS** (5/5 assertions) and orphan test PASS on the final v0.1.1 payload.

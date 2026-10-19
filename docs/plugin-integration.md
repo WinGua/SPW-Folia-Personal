@@ -115,17 +115,27 @@ exit ⇒ stdio EOF ⇒ helper exits by itself (verified no orphan).
   during team testing). Acceptance checks must be run when the desktop is quiet.
 - Coordinate clicking is the only SPW automation route (UIA exposes nothing on Compose Desktop); keep the
   SPW window at a known rect or re-derive the bar coordinates.
-- The in-page settings **gear** icon is visible but a synthetic click on it did not open the overlay in our
-  tests; the supported path is F1 / host `command:{open-settings}`. If product wants a clickable gear,
-  that is the settings-UI owner's (task-5/8) seam; the bridge itself is verified working (overlay shows,
-  ESC closes overlay first).
+- The in-page settings **gear** is clickable with real mouse input since v0.1.1 (pointer-events fix +
+  cursor fix + overlay UI-state fix). Automation must use DPI-aware SendInput and the settled gear centre
+  (CSS 1732,44 → screen 3118,79 at 3200x2000/DSF1.8); F1 / `command:{open-settings}` remains the
+  script-friendly path.
 - No competing ESC handler in the plugin: ESC is handled by page Shim → host `closed(reason=user)`
   (overlay-open → only overlay closes). Verified in `task7-esc1/2` screenshots.
 - Lyrics visibility depends on the playhead position (instrumental intros show the background only); the
   visualizer is fed by clock/track/lyrics and the style renders the lyric glyphs, not a subtitle track.
 - `track` payload is large (~5.3 MB) because of the embedded cover data URL; sent once per track change.
 
-## 6. Next-integration seam (audio spectrum, task-4)
+## 6. v0.1.1 menu-item styling
+
+The injected item is rendered by `spw-folia/src/main/kotlin/dev/spw/folia/FoliaMenuItem.kt`
+(`FoliaMenuItemContent`): a `Row` with the host's exact `MenuFlyoutItemCompat` metrics — start padding
+9.5 dp, 19 dp leading icon, 10.5 dp gap, 14 sp label, 11 dp trailing gap — and a monochrome two-sparkle
+Folia mark drawn with `Canvas` (no resource files), tinted `#EBEEF1` (the host menu content colour sampled
+from SPW 1.19.0). The label is `Folia`, i.e. the same casing as Folia's own product name, and the item is
+appended after 释放音频引擎 in the host's own MenuFlyoutScope, so hover/ripple/clipping/popup layout are
+all host-provided.
+
+## 7. Next-integration seam (audio spectrum, task-4)
 
 The helper already accepts `{"t":"audio","power":…,"bands":[bass,lowMid,mid,vocal,treble],
 "spectrum":[1024×0..255]}` and `{"t":"audioMode",…}`; the bridge builder is `FoliaHostBridge.sendAudio()`,

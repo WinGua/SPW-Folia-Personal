@@ -140,9 +140,24 @@ openDevTools → forwarded to stdout and acted on), `log`, `fps` (rAF meter: fps
 canvases/dpr/w/h), `key` (ESC handled host-side, F1 emits the `ui` toggle-settings action for the
 settings UI).
 
+### Cursor & settings-overlay UI state (v0.1.1)
+
+The fullscreen window does **not** hide the cursor permanently. A 15 ms tick in `HostForm.OnTick` tracks
+`Cursor.Position`; after 2.5 s without movement the host calls `Cursor.Hide()`, the next movement shows it
+again, and while the in-page 歌词样式 overlay is open the cursor is forced visible. Only state changes are
+logged (`cursor hide overlay=closed idleMs=…`, `cursor show …`) and the cursor is shown again when the
+window closes / the process exits.
+
+Overlay state comes from the page over the normal bridge: the settings UI reports every open/close via
+`chrome.webview.postMessage({"type":"ui","settingsOpen":bool})`; the Shim intercepts its own
+`settingsUI` special message so it is never re-dispatched locally (a v0.1.0 bug that echoed the state
+event and re-toggled the overlay hundreds of times per second). The same `settingsOpen` flag gives ESC its
+priority: F1/`command open-settings` opens the panel, ESC #1 closes the panel (window stays), ESC #2 closes
+the window (`closed{reason:user}`, exit 0).
+
 ### Window/lifecycle
 Borderless `Form`, black background; fullscreen uses `Screen.PrimaryScreen.Bounds`, `TopMost`,
-`ShowInTaskbar=false`, cursor hidden; ESC (host `ProcessCmdKey` or page keydown) and Alt+F4 close
+`ShowInTaskbar=false`; ESC (host `ProcessCmdKey` or page keydown) and Alt+F4 close
 with reason `user`, exit 0. WebView2 configured with autoplay allowed and throttling/occlusion
 disabled (`--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling
 --disable-renderer-backgrounding --disable-backgrounding-occluded-windows

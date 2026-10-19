@@ -117,7 +117,7 @@ Scripted assembly (Lead-owned, `docs/protocol.md` order-independent):
 ```bash
 cd spw-folia && ./gradlew.bat plugin        # 1. plugin classes/ (+ lib/ if any runtime deps)
 cd .. && bash packaging/build-package.sh     # 2. re-stage web/native/licenses + checksums
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.0.spmod --staging packaging --out dist --name spw-folia-0.1.0.spmod  # 3. merge into dist/
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.1.spmod --staging packaging --out dist --name spw-folia-0.1.1.spmod  # 3. merge into dist/
 node poc/webview/host/out/release-candidate/run-rc.mjs   # 4. re-validate from a clean unpack
 ```
 
@@ -134,6 +134,21 @@ sha256 8c265dc1aca7ee5ee378b65f5b045ccba7e51536e812e399b0d9cf6bd9d46838
 classes payload sha256 81137cc97612679bf0e2093292d6faf5040c05c523e1d9cd19a41cee37e791b9
 native host sha256 aee45d4a88c7395cce72b05eb7bb14f4e07188c4a20afe8b2d460f5f4c3337b4 (cache-buster build)
 ```
+
+### v0.1.1 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.1.spmod   12,450,886 B   1,938 entries
+sha256 9c4d206911eebc43869af2c0aae074efa8f672e081586946e022d7b4c89dac21
+classes payload sha256 838dc12b4b7a79cc5855f97c5c79f042fe94f6bf229d59f844dc60effe8c6c7a (menu-item styling)
+native host sha256 d75b97cbc692ab5e05b5b0cf2d2177002526849181a8787252a11cba896f71ad
+                    (cursor auto-hide + settings-overlay UI-state fix, cache-buster build)
+```
+
+v0.1.1 changes: host-style 更多 menu item (`FoliaMenuItemContent`, 19 dp sparkle + 14 sp label +
+host colour), cursor auto-hide/show (including override while the settings overlay is open), and the
+page↔host UI-state echo-loop fix that could blank/flap the settings overlay. Regression evidence:
+`poc/hook/shots/cursor-gear-click-0.png`, `docs/acceptance-report.md` addendum.
 
 
 ## 4. Plugin → host spawn contract

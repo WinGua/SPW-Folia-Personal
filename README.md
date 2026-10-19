@@ -47,6 +47,17 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   versions. See [docs/hook-target.md](docs/hook-target.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
 
+## What's new in v0.1.1
+
+- **The Folia menu entry now looks like a first-class host item** — same row layout as
+  播放速度 / 桌面歌词 / 歌词翻译 / 释放音频引擎: 19 dp sparkle icon tinted with the host content colour,
+  14 sp label, identical spacing and disabled alpha.
+- **Cursor auto-hide fixed** — in fullscreen the pointer hides after 2.5 s of inactivity, reappears on
+  movement, and is forced visible while the 歌词样式 overlay is open. (v0.1.0 hid the pointer permanently,
+  so the ⚙ gear could not be clicked.)
+- **Settings overlay reliability** — fixed a page↔host UI-state echo loop that could leave the panel
+  blank/flapping; the panel now scrolls correctly and reopens instantly.
+
 ## Verified end-to-end
 
 The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS channel) on Windows 11:
@@ -57,6 +68,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | Fullscreen 3200x2000 at 175% DPI, page 1776x1110 dpr1, 3 canvases, 110-120 fps; stable 16-min soak (66-67.5 MB working set) | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
 | Playhead + word-level lyrics advance from SPW playback (100 ms interpolated timeline); pause/resume and seek follow | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
 | Real mouse input: hover ⚙ opens the 歌词样式 overlay, ← returns to the renderer, ESC closes (exit 0) | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
+| **Folia** item matches host menu typography/sparkle icon; cursor hides when idle, returns on move, stays visible with settings open, real ⚙ click opens the panel (v0.1.1 regression) | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/plugin-integration.md](docs/plugin-integration.md) §7 |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
 | Full acceptance matrix (track change / seek / pause / no-lyrics / lifecycle / persistence / soak) | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
@@ -68,7 +80,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
 Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
 
-1. Download `spw-folia-0.1.0.spmod` from the [Releases](../../releases) page (Windows x64).
+1. Download `spw-folia-0.1.1.spmod` from the [Releases](../../releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -86,7 +98,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.0.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.1.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -99,8 +111,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.0.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.0.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.1.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.1.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 

@@ -84,6 +84,14 @@ namespace SpwFolia
         private bool layoutLogged;
         private bool pageViewportLogged;
 
+        // Cursor visibility: fullscreen hides the mouse pointer only after an idle period and
+        // shows it again on any movement, so the settings gear is always reachable (v0.1.1 hotfix).
+        private const long CursorIdleMs = 2500;
+        private Point cursorPos;
+        private long lastCursorMoveAt = -1;
+        private bool cursorVisible = true;
+        private bool settingsOverlayOpen;
+
         public int ExitCode { get { return exitCode; } }
 
         public HostForm(CliArgs parsedArgs, JsonStdout jsonLog)
@@ -104,7 +112,6 @@ namespace SpwFolia
             // must produce exactly the same fullscreen geometry as a shell launch.
             ShowInTaskbar = !args.Fullscreen;
             TopMost = args.TopMost;
-            if (args.Fullscreen) Cursor.Hide(); else Cursor = Cursors.Default;
             ClientSize = new Size(
                 Math.Max(64, args.Fullscreen ? 1600 : args.WindowWidth),
                 Math.Max(64, args.Fullscreen ? 900 : args.WindowHeight));
@@ -211,7 +218,7 @@ namespace SpwFolia
                 Bounds = target;
                 TopMost = args.TopMost;
                 ShowInTaskbar = !args.Fullscreen;
-                if (args.Fullscreen) Cursor.Hide(); else Cursor = Cursors.Default;
+                Cursor = Cursors.Default;
                 geometryApplied = true;
                 log.Log("info", "geometry reason=" + reason
                     + " mode=" + (args.Fullscreen ? "fullscreen" : "windowed")
@@ -225,6 +232,57 @@ namespace SpwFolia
                 SyncWebViewBounds("geometry:" + reason);
             }
             catch (Exception ex) { log.Error("geometry", ex); }
+        }
+
+        /// <summary>
+        /// Tracks physical cursor movement (the WebView2 child owns mouse input, so we poll the OS
+        /// cursor position from the 15 ms host tick). Shows the pointer on movement and while the
+        /// settings overlay is open; hides it after a short idle period in fullscreen for immersion.
+        /// </summary>
+        private void TrackCursor()
+        {
+            try
+            {
+                if (!args.Fullscreen)
+                {
+                    SetCursorVisible(true);
+                    return;
+                }
+                Point pos = Cursor.Position;
+                long now = clock.ElapsedMilliseconds;
+                if (lastCursorMoveAt < 0 || pos != cursorPos)
+                {
+                    cursorPos = pos;
+                    lastCursorMoveAt = now;
+                }
+                bool idle = now - lastCursorMoveAt >= CursorIdleMs;
+                SetCursorVisible(settingsOverlayOpen || !idle);
+            }
+            catch (Exception ex) { log.Error("cursor-track", ex); }
+        }
+
+        private void ShowCursorNow()
+        {
+            try
+            {
+                lastCursorMoveAt = clock.ElapsedMilliseconds;
+                SetCursorVisible(true);
+            }
+            catch (Exception) { }
+        }
+
+        private void SetCursorVisible(bool visible)
+        {
+            if (cursorVisible == visible) return;
+            cursorVisible = visible;
+            try
+            {
+                if (visible) Cursor.Show(); else Cursor.Hide();
+                log.Log("info", "cursor " + (visible ? "show" : "hide")
+                    + " overlay=" + (settingsOverlayOpen ? "open" : "closed")
+                    + " idleMs=" + (clock.ElapsedMilliseconds - lastCursorMoveAt));
+            }
+            catch (Exception ex) { log.Error("cursor", ex); }
         }
 
         /// <summary>Keeps the WebView2 control exactly on the client rectangle after geometry/DPI changes.</summary>
@@ -270,6 +328,7 @@ namespace SpwFolia
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            ShowCursorNow();
             timer.Stop();
             exitTimer.Stop();
             SendClosed();
@@ -285,6 +344,7 @@ namespace SpwFolia
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            ShowCursorNow();
             if (keyData == Keys.Escape && args.EscapeCloses)
             {
                 CloseWith("user", 0);
@@ -467,9 +527,15 @@ namespace SpwFolia
             }
             else if (type == "settingsUI" || type == "ui-state")
             {
-                // Settings UI reports open/close transitions (optional; ignored by protocol v1 hosts).
+                // Settings UI reports open/close transitions so the host can keep the system cursor
+                // visible while the overlay is open (protocol §7.5).
                 string st = JsonUtil.GetString(msg, "state");
-                if (st != null) log.Log("info", "settings-ui state=" + st);
+                if (st != null && st.Length > 0)
+                {
+                    settingsOverlayOpen = st == "open";
+                    log.Log("info", "settings-ui state=" + st);
+                    TrackCursor();
+                }
             }
             else if (type == "settings")
             {
@@ -535,6 +601,7 @@ namespace SpwFolia
 
         private void OnTick(object sender, EventArgs e)
         {
+            TrackCursor();
             long now = clock.ElapsedMilliseconds;
             long elapsed = now - lastTick;
             if (lastTick == 0) elapsed = 16;
@@ -823,9 +890,21 @@ namespace SpwFolia
                 string path = JsonUtil.GetString(msg, "path");
                 SafeBeginInvoke(delegate { CaptureScreenshotAsync(path); });
             }
-            else if (command == "settings") PostToPage("{\"type\":\"ui\",\"action\":\"toggle-settings\"}");
-            else if (command == "open-settings") PostToPage("{\"type\":\"ui\",\"action\":\"open-settings\"}");
-            else if (command == "close-settings") PostToPage("{\"type\":\"ui\",\"action\":\"close-settings\"}");
+            else if (command == "settings")
+            {
+                settingsOverlayOpen = !settingsOverlayOpen;
+                PostToPage("{\"type\":\"ui\",\"action\":\"toggle-settings\"}");
+            }
+            else if (command == "open-settings")
+            {
+                settingsOverlayOpen = true;
+                PostToPage("{\"type\":\"ui\",\"action\":\"open-settings\"}");
+            }
+            else if (command == "close-settings")
+            {
+                settingsOverlayOpen = false;
+                PostToPage("{\"type\":\"ui\",\"action\":\"close-settings\"}");
+            }
             else if (command == "eval")
             {
                 string script = JsonUtil.GetString(msg, "script");

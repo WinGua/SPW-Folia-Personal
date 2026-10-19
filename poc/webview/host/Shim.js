@@ -264,6 +264,7 @@
     },
     emit: function (type, payload) {
       if (type === 'settings') post({ type: 'settings', settings: payload });
+      else if (type === 'settingsUI') post({ type: 'settingsUI', state: (payload && payload.state) || 'open' });
       else if (type === 'action') post({ type: 'action', name: (payload && payload.name) || payload });
       else if (type === 'log') post({ type: 'log', level: (payload && payload.level) || 'info', msg: (payload && payload.msg) || '' });
       else post({ type: type, payload: payload });

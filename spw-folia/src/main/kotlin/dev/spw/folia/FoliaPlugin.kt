@@ -3,7 +3,6 @@
 
 package dev.spw.folia
 
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import com.xuncorp.spw.workshop.api.PluginContext
 import com.xuncorp.spw.workshop.api.PluginPermission
@@ -231,7 +230,7 @@ class FoliaPlugin(
                 openFolia()
             }
             val content: @Composable () -> Unit = {
-                BasicText("Folia")
+                FoliaMenuItemContent()
             }
 
             bridgeMethod.isAccessible = true
@@ -347,7 +346,7 @@ class FoliaPlugin(
 
     companion object {
         const val SPW_VERSION = "1.19.0"
-        const val PLUGIN_VERSION = "0.1.0"
+        const val PLUGIN_VERSION = "0.1.1"
 
         /** How long the start-up watcher waits for PF4J to instantiate the playback extension. */
         private const val EXTENSION_WATCH_MS = 20_000L

@@ -258,6 +258,7 @@ export const registerSettingsUiController = (controls: { open: () => void; close
         closeSettings: () => controller.close(),
     };
     const offLocal = bridgeOn<{ action?: string }>('settingsUI', payload => {
+        if (!payload?.action) return;
         const action = uiActionToCommand(payload?.action);
         if (action === 'open') controller.open();
         else if (action === 'close') controller.close();
@@ -277,7 +278,22 @@ export const registerSettingsUiController = (controls: { open: () => void; close
 
 let openState = false;
 export const setSettingsUiOpenState = (open: boolean): void => {
+    if (openState === open) return;
     openState = open;
+    // protocol §7.5: tell the host so it keeps the system cursor visible while the overlay is
+    // open (the host hides the pointer after an idle period in fullscreen mode). Post straight to
+    // the WebView2 channel: routing this through `__SPW_FOLIA__.emit` would echo it back into the
+    // page's own 'ui' listener and make the panel toggle forever.
+    const post = (window as unknown as {
+        chrome?: { webview?: { postMessage: (message: unknown) => void } };
+    }).chrome?.webview?.postMessage;
+    if (typeof post === 'function') {
+        try {
+            post({ type: 'settingsUI', state: open ? 'open' : 'closed' });
+        } catch (error) {
+            console.warn('[spw-folia] failed to report settings ui state', error);
+        }
+    }
 };
 const isSettingsUiOpen = (): boolean => openState;
 
