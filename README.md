@@ -15,6 +15,8 @@
 
 <p align="center"><img src="docs/images/fullscreen-chrome.jpg" width="88%" alt="Folia 全屏可视化器与右上角 ⚙ 设置按钮"></p>
 
+<p align="center"><img src="docs/images/transparent-background.jpg" width="88%" alt="播放页透明背景：窗口真透明，歌词与特效叠加在桌面之上，右下角是「播放页透明背景」开关"></p>
+
 ## 功能
 
 - **模组管理作者名**：`azkbzxf`（GitHub 账号，v0.1.3 起）。
@@ -30,6 +32,9 @@
 - **设置页实时大预览**（v0.1.6）— 「歌词样式」左侧大预览不是静态截图，而是同源 iframe 里的
   真实 Folia 渲染器逐帧绘制：样式、纹理分辨率、镜头运动、字体、背景、主题改动即时生效，
   暂停/播放按钮真正冻结和恢复画面。
+- **播放页透明背景**（v0.1.7）— 全屏播放页右下角的圆形「调音台」按钮里可开关「播放页透明背景」：
+  开启后宿主窗口变成真正的透明窗口，Folia 不再绘制背景，歌词与特效直接叠加在桌面或其它窗口之上
+  （直播 / OBS 叠加场景）。开关随设置树持久化。
 - **封面取色** — 主题、背景与强调色由当前歌曲封面派生（v0.1.2 修复），随封面切换实时变化。
 - **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自
   SPW 播放 API 加一条平滑插值时间轴。
@@ -52,6 +57,29 @@
 - **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆
   变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
 - 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
+- **透明模式是鼠标穿透的**（色键窗口的系统特性）：开启「播放页透明背景」后页面内控件点不到，
+  这是叠加用途的预期行为；左下角会出现一个常驻的「恢复不透明背景 · Ctrl+Alt+B」浮标，点它或按
+  **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B）即可恢复不透明，ESC 仍可退出
+  播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
+
+## v0.1.7 更新内容
+
+- **播放页透明背景** — 全屏播放页右下角新增与 SPW 播放页控制按钮同位置的金色圆形「调音台」按钮，
+  点开是「播放页透明背景」开关（布局对齐 SPW 播放页的同一设置项）。开启后窗口变为色键透明窗口、
+  Folia 侧 `background.transparent=true` 停止绘制背景，页面底色本就是透明的，因此歌词/特效真正
+  叠加在桌面或其它窗口之上，而不是变成纯黑。
+- **透明模式的交互兜底** — 色键窗口是鼠标穿透的，所以透明开启后页面内按钮不可点：左下角会出现一个
+  不抢焦点的常驻浮标「恢复不透明背景 · Ctrl+Alt+B」，点它或按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y /
+  Ctrl+Alt+P / Ctrl+Alt+Shift+B）一键恢复不透明，同时通过页面钩子把开关同步回「关」、随设置持久化
+  （修掉了「退出透明后再次开启无效」的状态不同步问题）；ESC 仍可退出播放。
+- **颜色保真** — 色键合成会丢弃 `backdrop-filter` 图层（否则 chrome 在屏幕上整块消失），透明开启时
+  chrome 常驻并自动切换到无模糊的 flat 样式；恢复不透明后毛玻璃效果回来。
+- **零插件改动** — 新字段 `transparentPlayerBackground` 走现有设置树（插件整树持久化），宿主从
+  settings JSON 读取并切换窗口透明度，透明状态在重启后保留。
+- 机制与限制见 [docs/live-transparency.md](docs/live-transparency.md)，验证见
+  [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md)。
+
+![播放页透明背景：窗口真透明，歌词与特效叠加在桌面之上，右下角为「播放页透明背景」开关](docs/images/transparent-background.jpg)
 
 ## v0.1.6 更新内容
 
@@ -129,6 +157,7 @@
 | v0.1.3：模组管理作者名 = `azkbzxf`；A/B 组失效控件全部移除；字体族/字重/字幕字体在 `pushConfig` 中生效 | [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | v0.1.4：设置页大预览随样式选择实时切换（本地 harness 6 连点 + 真实 SPW 鼠标点击验证） | [docs/verification-v0.1.4.md](docs/verification-v0.1.4.md) |
 | v0.1.6：设置页大预览 = iframe 内真实 Folia 渲染器（3 canvas、暂停帧差 0.00000、切样式即时生效、5 轮开合复用同一 iframe、0 页面错误） | [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) |
+| v0.1.7：播放页透明背景（色键窗口真透明、桌面透出、左下浮标/ Ctrl+Alt+B 恢复不透明并同步页面开关、退出后再次开启正常、设置树持久化、ESC 退出、透明时 chrome 可见） | [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -139,7 +168,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.6.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.7.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -156,7 +185,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.6.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.7.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -169,8 +198,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.6.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.6.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.7.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.7.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

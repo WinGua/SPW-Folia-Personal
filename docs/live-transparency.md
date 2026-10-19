@@ -60,10 +60,23 @@ webView.DefaultBackgroundColor = Color.Black;
    → 透明模式定位为「叠加在桌面上的歌词层」；要操作页面必须用热键，面板里常驻一行提示。
 2. **`backdrop-filter` 图层在色键合成下不绘制**（chrome 和面板的 `backdrop-filter: blur()` 会让它们整块消失，但 `CapturePreviewAsync` 抓页面表面时它们又都在——这组"表面有、屏幕无"的对照把原因锁定在合成层）。
    → 透明时给两个 chrome 加 `data-flat='true'`，CSS 里 `backdrop-filter: none`（`.spw-chrome-btn[data-flat='true']`、`.spw-player-bg[data-flat='true'] …`）。视觉上少一层模糊，可读性不受影响。
-3. **透明后鼠标点不到页面，就无法关掉透明** → 全局热键逃生：
-   - `RegisterHotKey` 链 **Ctrl+Alt+B** → Ctrl+Alt+Y → Ctrl+Alt+P → Ctrl+Alt+Shift+B（本机 Ctrl+Alt+T 已被别的程序占用，所以 B 优先）；
-   - 只在透明生效时注册，关闭透明即 `UnregisterHotKey`；日志 `transparency hotkey=registered mods=0x3 vk=0x42` / `hotkey=off` / `hotkey=unregistered` / `hotkey=failed`；
-   - `WM_HOTKEY` 处理：`SetTransparency(false)` + `ExecuteScriptAsync("window.__spwFoliaSetTransparent(false)")`——后者由 `App.tsx` 注册到 `useSettingsStore`，于是页面开关同步回 off、再随 settings 回环持久化成 `false`。
+3. **透明后鼠标点不到页面，就无法关掉透明** → 两条逃生通道：
+   - **左下角浮标**：宿主创建一个小型 `TransparencyBadge : Form`（248×46，深色底 + 金色描边，文本
+     「恢复不透明背景 · Ctrl+Alt+B」），`TopMost`、`ShowInTaskbar = false`、`ShowWithoutActivation = true`
+     + `WS_EX_NOACTIVATE`（不抢焦点，否则 ESC 会失效），`PlaceBottomLeft()` 贴在主屏工作区左下
+     `(work.Left + 24, work.Bottom - Height - 24)`；左键 `MouseDown` 触发 `RestoreRequested` → `ExitTransparentMode("badge")`。
+     透明开启即显示，关闭即隐藏。日志 `transparency badge=shown at=x,y` / `badge=hidden`。
+   - **全局热键**：`RegisterHotKey` 链 **Ctrl+Alt+B** → Ctrl+Alt+Y → Ctrl+Alt+P → Ctrl+Alt+Shift+B
+     （本机 Ctrl+Alt+T 已被别的程序占用，所以 B 优先）；只在透明生效时注册，关闭透明即
+     `UnregisterHotKey`；日志 `transparency hotkey=registered mods=0x3 vk=0x42` / `hotkey=off` /
+     `hotkey=unregistered` / `hotkey=failed`。
+   - 两条通道都走 `ExitTransparentMode(source)`：log `transparency exit source=badge|hotkey` →
+     `SetTransparency(false)` → `ExecuteScriptAsync("window.__spwFoliaSetTransparent(false)")`。后者由
+     `App.tsx` 注册到 `useSettingsStore`，于是页面开关同步回 off、再随 settings 回环持久化成 `false`。
+   - **状态机要点**：`transparencyActive`（窗口实际状态）与 `transparencyTarget`（页面开关的意图）必须
+     分开且都由 `SetTransparency()` 收尾时对齐；`ApplyTransparencyFromSettings()` 只在
+     `on != transparencyActive` 时才真正切窗口。早期版本用 `on == transparencyTarget` 提前 return，
+     导致「浮标/热键退出后页面开关还亮着，再点开关无效」——v0.1.7 发布前已修（验证脚本 9/9 PASS）。
 
 透明时 chrome 常驻（`chromeAlwaysOn = transparentPlayerBackground === true`），并且 ESC 仍可关窗（窗口保持键盘焦点时；一旦发生穿透点击转移焦点就只剩热键可用）。
 

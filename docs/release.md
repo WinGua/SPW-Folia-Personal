@@ -372,3 +372,27 @@ v0.1.5 (static Ken Burns preview) was never released; v0.1.6 replaces it with th
 inside a same-origin iframe (rAF-gated pause that truly freezes the frame, static-frame fallback,
 iframe reuse across open/close). See `docs/verification-v0.1.5.md`,
 `docs/verification-live-preview-ui.md`, `docs/live-preview-iframe.md`, `docs/release-notes-v0.1.6.md`.
+
+### v0.1.7 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.7.spmod   12,970,892 B   1,941 entries
+sha256  5cf8eba69c9d1bb961efd160075c29b9cde52e5b30699598e5ec174106dd5138
+manifest: Plugin-Version 0.1.7 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.7.spmod 86,953 B
+        native/spw-folia-host.exe  : 248e1b021ddf594491b128c018151c07765b689ecc5a081054380dc55330ca2b
+                                     123,392 B (colour-key transparency + restore chip + hotkey state machine)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,066,766 B; player background panel + flat mode)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.7.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.1.7.spmod
+```
+
+v0.1.7 adds the player-page transparent background: the bottom-right sliders button opens a panel with
+the「播放页透明背景」switch, the host window becomes a colour-key transparent window and Folia stops
+painting its background, so lyrics float over the desktop. Because colour-key windows are mouse
+click-through, a bottom-left「恢复不透明背景 · Ctrl+Alt+B」chip (plus Ctrl+Alt+B / Ctrl+Alt+Y /
+Ctrl+Alt+P / Ctrl+Alt+Shift+B hotkeys) restores opacity and syncs the page switch. See
+`docs/verification-v0.1.7.md`, `docs/live-transparency.md`, `docs/release-notes-v0.1.7.md`.

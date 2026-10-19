@@ -112,6 +112,10 @@ namespace SpwFolia
         private static readonly uint[] HotkeyVks = { 0x42 /* B */, 0x59 /* Y */, 0x50 /* P */, 0x42 /* B */ };
         private bool transparencyHotkeyRegistered;
 
+        // v0.1.7b: besides the hotkey, a separate always-on-top badge window offers a mouse way back.
+        // It is NOT layered, so it receives clicks even while the player window is click-through.
+        private TransparencyBadge transparencyBadge;
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
@@ -202,8 +206,10 @@ namespace SpwFolia
                 catch (Exception ex) { log.Error("transparency-parse", ex); }
             }
             if (args.NoTransparency) on = false;
-            if (on == transparencyTarget) return;
+            // Keep the target in sync with the page even when the window is already in that mode:
+            // exiting via the badge/hotkey leaves the page switch on, so the next "on" must re-apply.
             transparencyTarget = on;
+            if (on == transparencyActive) return;
             if (IsHandleCreated) SafeBeginInvoke(delegate { SetTransparency(on); });
             else SetTransparency(on);
         }
@@ -228,7 +234,10 @@ namespace SpwFolia
                     webView.DefaultBackgroundColor = Color.Black;
                 }
                 transparencyActive = on;
+                transparencyTarget = on;
                 EnsureTransparencyHotkey();
+                if (on) ShowTransparencyBadge();
+                else HideTransparencyBadge();
                 log.Log("info", "transparency mode=" + (on ? "on" : "off"));
             }
             catch (Exception ex) { log.Error("transparency", ex); }
@@ -268,12 +277,60 @@ namespace SpwFolia
             const int WM_HOTKEY = 0x0312;
             if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == TransparencyHotkeyId)
             {
-                log.Log("info", "transparency hotkey=off");
-                SetTransparency(false);
-                SyncPageTransparency(false);
+                ExitTransparentMode("hotkey");
                 return;
             }
             base.WndProc(ref m);
+        }
+
+        /// <summary>
+        /// The colour-key player window cannot receive clicks, so transparency is left either with the
+        /// global hotkey or by clicking the badge window. Both paths land here: restore the opaque
+        /// window and push the switch back to off so the setting (and its persistence) stays in sync.
+        /// </summary>
+        private void ExitTransparentMode(string source)
+        {
+            log.Log("info", "transparency exit source=" + source
+                + " hotkey=" + (transparencyHotkeyRegistered ? "on" : "off"));
+            SetTransparency(false);
+            SyncPageTransparency(false);
+        }
+
+        private void ShowTransparencyBadge()
+        {
+            try
+            {
+                if (transparencyBadge == null)
+                {
+                    transparencyBadge = new TransparencyBadge();
+                    transparencyBadge.RestoreRequested += OnBadgeRestoreRequested;
+                }
+                transparencyBadge.PlaceBottomLeft();
+                if (!transparencyBadge.Visible) transparencyBadge.Show();
+                transparencyBadge.BringToFront();
+                log.Log("info", "transparency badge=shown at="
+                    + transparencyBadge.Location.X + "," + transparencyBadge.Location.Y);
+            }
+            catch (Exception ex) { log.Error("transparency-badge", ex); }
+        }
+
+        private void HideTransparencyBadge()
+        {
+            try
+            {
+                if (transparencyBadge != null && transparencyBadge.Visible)
+                {
+                    transparencyBadge.Hide();
+                    log.Log("info", "transparency badge=hidden");
+                }
+            }
+            catch (Exception ex) { log.Error("transparency-badge", ex); }
+        }
+
+        private void OnBadgeRestoreRequested(object sender, EventArgs e)
+        {
+            try { SafeBeginInvoke(delegate { ExitTransparentMode("badge"); }); }
+            catch (Exception ex) { log.Error("transparency-badge", ex); }
         }
 
         private void SyncPageTransparency(bool on)
@@ -473,6 +530,8 @@ namespace SpwFolia
                 UnregisterHotKey(Handle, TransparencyHotkeyId);
                 transparencyHotkeyRegistered = false;
             }
+            try { if (transparencyBadge != null) { transparencyBadge.Dispose(); transparencyBadge = null; } }
+            catch (Exception) { }
             SendClosed();
             log.Log("info", "host-exit code=" + exitCode + " reason=" + closeReason
                 + " framesPosted=" + totalFramesPosted
@@ -1385,6 +1444,83 @@ namespace SpwFolia
                 if (IsHandleCreated && !IsDisposed) BeginInvoke(action);
             }
             catch (Exception) { }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// v0.1.7b: player-page transparency escape hatch
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// A small always-on-top badge shown while the player background is transparent. The player window is
+/// colour-key layered and consequently click-through, so this plain (non-layered, never-activated)
+/// window is the mouse route back to the opaque player; the global hotkey is the keyboard route.
+/// </summary>
+internal sealed class TransparencyBadge : Form
+{
+    private const string BadgeText = "恢复不透明背景 · Ctrl+Alt+B";
+    private readonly Label textLabel;
+
+    public event EventHandler RestoreRequested;
+
+    public TransparencyBadge()
+    {
+        FormBorderStyle = FormBorderStyle.None;
+        StartPosition = FormStartPosition.Manual;
+        ShowInTaskbar = false;
+        TopMost = true;
+        AutoScaleMode = AutoScaleMode.None;
+        BackColor = Color.FromArgb(26, 22, 18);
+        Cursor = Cursors.Hand;
+        ClientSize = new Size(248, 46);
+
+        textLabel = new Label();
+        textLabel.Dock = DockStyle.Fill;
+        textLabel.TextAlign = ContentAlignment.MiddleCenter;
+        textLabel.ForeColor = Color.FromArgb(235, 216, 180);
+        textLabel.BackColor = Color.Transparent;
+        textLabel.Font = new Font("Microsoft YaHei UI", 9.5f, FontStyle.Regular);
+        textLabel.Text = BadgeText;
+        textLabel.Cursor = Cursors.Hand;
+        textLabel.MouseDown += OnAnyMouseDown;
+        Controls.Add(textLabel);
+        MouseDown += OnAnyMouseDown;
+        Paint += OnPaintBadge;
+    }
+
+    // Never take activation away from the player: ESC must keep reaching the player window.
+    protected override bool ShowWithoutActivation { get { return true; } }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE
+            return cp;
+        }
+    }
+
+    public void PlaceBottomLeft()
+    {
+        Screen screen = Screen.PrimaryScreen;
+        Rectangle work = screen != null ? screen.WorkingArea : new Rectangle(0, 0, 1280, 720);
+        Location = new Point(work.Left + 24, work.Bottom - Height - 24);
+    }
+
+    private void OnAnyMouseDown(object sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left) return;
+        EventHandler handler = RestoreRequested;
+        if (handler != null) handler(this, EventArgs.Empty);
+    }
+
+    private void OnPaintBadge(object sender, PaintEventArgs e)
+    {
+        using (Pen pen = new Pen(Color.FromArgb(214, 168, 84), 1))
+        {
+            e.Graphics.DrawRectangle(pen, 0, 0, ClientSize.Width - 1, ClientSize.Height - 1);
         }
     }
 }

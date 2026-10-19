@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T10:53:36.312Z",
+  "generatedAt": "2026-10-19T11:06:37.096Z",
   "out": "packaging/web",
   "webFiles": 1877,
   "webBytes": 20546706,
@@ -11,8 +11,8 @@
     "placeholder_cover2": "assets/placeholder_cover-2-BuqqkGqf.jpg"
   },
   "settingsFiles": 15,
-  "settingsBytes": 2285771,
-  "totalBytes": 22832477,
+  "settingsBytes": 2285792,
+  "totalBytes": 22832498,
   "excluded": {
     "swTrio": [
       "registerSW.js",

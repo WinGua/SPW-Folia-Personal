@@ -16,6 +16,8 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
 
 <p align="center"><img src="docs/images/fullscreen-chrome.jpg" width="88%" alt="Folia fullscreen visualizer with the ⚙ Folia settings button"></p>
 
+<p align="center"><img src="docs/images/transparent-background.jpg" width="88%" alt="Transparent player background: the window is genuinely transparent, lyrics and effects float over the desktop, the switch sits at the bottom-right"></p>
+
 ## Features
 
 - **Real Folia renderer, not a port** — the plugin hosts Folia 0.7.21's production
@@ -31,6 +33,12 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   not a static screenshot but Folia's real renderer running frame by frame inside a same-origin iframe:
   style, texture resolution, camera motion, typography, background and theme changes apply live, and
   the pause/play button genuinely freezes and resumes the picture.
+- **Transparent player background** (v0.1.7) — the round "sliders" button at the bottom-right corner
+  of the fullscreen player opens a small panel with a **播放页透明背景 (transparent player background)**
+  switch, placed exactly where SPW's own player page keeps its control button. When it is on, the helper
+  window becomes a real colour-key transparent window and Folia stops drawing its background, so lyrics
+  and effects float straight over the desktop or any other window (ideal for OBS / livestream overlays).
+  The switch is part of the settings tree and persists across restarts.
 - **Cover-colour theming** — theme, background tint and accent are derived from the current track's
   album art (fixed in v0.1.2) and follow cover changes live.
 - **Synced to SPW playback** — track, lyrics timeline (word-level cells), subtitle translation,
@@ -55,7 +63,36 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
 - **Pinned to Salt Player for Windows 1.19.0** — the menu hook targets one host build
   (SPW's internal names are obfuscated per release); the plugin refuses to install the hook on other
   versions. See [docs/hook-target.md](docs/hook-target.md).
+- **Transparent mode is mouse click-through** (a property of colour-key windows): while it is on the
+  in-page controls cannot be clicked, which is the intended behaviour for overlay use. A small,
+  non-activating chip appears at the bottom-left ("恢复不透明背景 · Ctrl+Alt+B"); click it or press
+  **Ctrl+Alt+B** (fallbacks Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B) to restore an opaque window,
+  and ESC still exits playback. Details: [docs/live-transparency.md](docs/live-transparency.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
+
+## What's new in v0.1.7
+
+- **Transparent player background** — a gold round "sliders" button now sits at the bottom-right of the
+  fullscreen player, at the same spot as SPW's own player-page control button. It opens a panel with a
+  **播放页透明背景** switch (same row layout as SPW's setting). Turning it on makes the helper window a
+  colour-key transparent window and sends `background.transparent=true`, so Folia skips its background
+  renderer while the page keeps its own transparent document background: lyrics and effects truly float
+  over the desktop instead of rendering black.
+- **A way out of transparent mode** — colour-key windows are mouse click-through, so once transparency
+  is on the in-page buttons cannot be clicked. The panel keeps a hint, a small non-activating chip is
+  shown at the bottom-left, and **Ctrl+Alt+B** (fallbacks Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B)
+  restores opacity, flips the switch back off through a page hook and persists that state (this also
+  fixes a state-desync bug where re-enabling right after an escape did nothing). ESC still exits playback.
+- **Colour fidelity** — colour-key composition drops `backdrop-filter` layers (without the fix the chrome
+  vanished on screen), so while transparency is on the chrome stays visible and switches to a flat,
+  blur-free style; the frosted glass comes back when the window is opaque again.
+- **No plugin changes** — the new `transparentPlayerBackground` field rides the existing settings tree
+  (the plugin persists the tree verbatim); the helper reads it from the settings JSON and switches the
+  window, so the state survives restarts.
+- Mechanism and limits: [docs/live-transparency.md](docs/live-transparency.md); verification:
+  [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md).
+
+![Transparent player background: the window is genuinely transparent, lyrics and effects float over the desktop, the switch is at the bottom-right](docs/images/transparent-background.jpg)
 
 ## What's new in v0.1.6
 
@@ -138,6 +175,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | Playhead + word-level lyrics advance from SPW playback (100 ms interpolated timeline); pause/resume and seek follow | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
 | Real mouse input: hover ⚙ opens the 歌词样式 overlay, ← returns to the renderer, ESC closes (exit 0) | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
 | v0.1.6: the settings-page big preview is the real Folia renderer inside an iframe (3 canvases, paused frame diff 0.00000, instant style switch, one reused iframe across 5 open/close cycles, 0 page errors) | [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) |
+| v0.1.7: transparent player background (colour-key window really transparent, desktop shows through, bottom-left chip / Ctrl+Alt+B restores opacity and syncs the page switch, re-enable after an escape works, settings tree persisted, ESC exits, chrome still visible while transparent) | [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md) |
 | **Folia** item matches host menu typography/sparkle icon (v0.1.1); **cover-colour theming** follows the album art (v0.1.2: orange vs black cover mean RGB 165/105/66 vs 71/71/72); **v0.1.3**: mod-manager author = `azkbzxf`, inert controls removed, font family/weight + subtitle fonts effective | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
@@ -150,7 +188,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
 Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
 
-1. Download `spw-folia-0.1.6.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.1.7.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -168,7 +206,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.6.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.7.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -181,8 +219,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.6.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.6.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.7.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.7.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 
