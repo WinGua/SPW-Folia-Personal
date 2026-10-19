@@ -331,3 +331,20 @@ removed at build time (beat effects, custom/system fonts, romanisation & duet su
 backgrounds, tempera/monet/cappella uploads); group-C settings fixed by mapping font family/weight and
 subtitle fonts into `theme` / `subtitleTheme`. See `docs/verification-v0.1.3.md`,
 `docs/known-inert-settings.md`, `docs/release-notes-v0.1.3.md`.
+
+### v0.1.4 release artifact (final)
+
+```
+dist/release/spw-folia-0.1.4.spmod   12,405,269 B   1,937 entries
+sha256  24ddaf34982a6acb9b92943ead1123d6dfb34ed4c9ae082c94ed2e7d1d82c04e
+manifest: Plugin-Version 0.1.4 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.4.spmod 86,955 B
+        native/spw-folia-host.exe  : d75b97cbc692ab5e05b5b0cf2d2177002526849181a8787252a11cba896f71ad
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,054,069 B; preview crossfade fix)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+```
+
+v0.1.4 changes: the settings page's big style preview now follows the selected style (effect keyed on
+the target src + CSS `spw-preview-in` fade). See `docs/verification-v0.1.4.md`,
+`docs/release-notes-v0.1.4.md`.

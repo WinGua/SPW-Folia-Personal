@@ -149,3 +149,13 @@ mapping fix (font family/weight, subtitle fonts). Commands and raw evidence:
 | Real SPW 1.19.0 install of v0.1.3 | PASS — `start … version=0.1.3`, hook appended/clicked, spawn from installed `native/` payload, fullscreen 3200×2000, settings inject `?v=0.1.3`, real mouse ⚙ opens panel (no inert controls), ESC closes overlay then window, `host-exit code=0 reason=user … lastFps=120`, no orphan helper |
 
 | Cursor behaviour on v0.1.2 build | PASS — host log `cursor hide overlay=closed idleMs=2507`, returns on movement, forced visible while overlay open (unchanged from v0.1.1) |
+
+## Addendum — v0.1.4 regression (2026-10-19)
+
+Scope: lyric-style preview now follows the selected style (m03519). Evidence: `docs/verification-v0.1.4.md`.
+
+| check | result |
+| --- | --- |
+| Local host harness, 6 consecutive style clicks (商籁→凝彩→莫奈→时计→群唱→静止) | PASS — big preview img src follows each click (`sonnet/tempera/monet/pendolo/cappella/still.jpg`, opacity 1 after 600 ms), report `tmp-verify/preview-probe2/preview-report.json` |
+| Real SPW 1.19.0 + v0.1.4 install | PASS — menu click opens fullscreen, real mouse ⚙ opens panel; clicking 凝彩/莫奈/静止 updates the big preview, parameter panel and grid highlight simultaneously (screenshots `tmp-verify/v014-*.png`) |
+| Regression: prior v0.1.3 fixes intact | PASS — no inert controls, font family/weight mapping still applied, cover-colour theming unchanged |

@@ -53,6 +53,16 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   versions. See [docs/hook-target.md](docs/hook-target.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
 
+## What's new in v0.1.4
+
+- **Fixed the lyric-style preview not following the selected style** — the big preview's crossfade
+  was driven by an effect keyed on `[src, current]`; `setCurrent()` retriggered the effect and its
+  cleanup cancelled the fade timers, so after the first switch the new frame stayed at opacity 0 while
+  the old one remained visible. It now uses an effect keyed on the target `src` only plus a CSS
+  `spw-preview-in` fade (220 ms): clicking any style tile instantly updates the preview, the parameter
+  panel and the selection highlight, even with rapid switching.
+- Evidence: [docs/verification-v0.1.4.md](docs/verification-v0.1.4.md).
+
 ## What's new in v0.1.3
 
 - **Mod manager author is now the GitHub account** — the plugin manifest `Plugin-Provider` changed from
@@ -114,7 +124,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
 Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
 
-1. Download `spw-folia-0.1.3.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.1.4.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -132,7 +142,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.3.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.4.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -145,8 +155,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.3.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.3.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.4.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.4.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 

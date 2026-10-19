@@ -50,6 +50,14 @@
   变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
 - 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
 
+## v0.1.4 更新内容
+
+- **修复歌词样式预览不随所选样式变化** — 设置页左侧大预览的交叉淡入由 `[src, current]` 依赖的
+  effect 驱动，`setCurrent()` 触发重新执行时会取消自己的淡入定时器，导致第一次切换之后新图一直停
+  在 opacity 0（旧图不透明）。重写为只依赖目标图的 effect + CSS `spw-preview-in` 淡入（220ms），
+  点击任意样式格后大预览/参数面板/高亮立即同步切换，连续切换也不再卡住。
+- 验证见 [docs/verification-v0.1.4.md](docs/verification-v0.1.4.md)。
+
 ## v0.1.3 更新内容
 
 - **模组管理作者名改为 GitHub 账号** — 插件清单 `Plugin-Provider` 由 `dsh2 team` 改为 **`azkbzxf`**，
@@ -97,6 +105,7 @@
 | **更多** 菜单中的 Folia 条目与宿主字体/星芒图标一致（v0.1.1）；**封面取色**随歌曲封面派生主题（v0.1.2，橙/黑纯色封面平均 RGB 165/105/66 vs 71/71/72） | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md) |
 | 设置/样式在 SPW 重启后保留；禁用插件后恢复 4 项菜单；5 次开/关与杀掉 SPW 后无残留辅助进程 | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | v0.1.3：模组管理作者名 = `azkbzxf`；A/B 组失效控件全部移除；字体族/字重/字幕字体在 `pushConfig` 中生效 | [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
+| v0.1.4：设置页大预览随样式选择实时切换（本地 harness 6 连点 + 真实 SPW 鼠标点击验证） | [docs/verification-v0.1.4.md](docs/verification-v0.1.4.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -107,7 +116,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.3.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.4.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -124,7 +133,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.3.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.4.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -137,8 +146,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.3.spmod ^
-    --staging packaging --out dist --name spw-folia-0.1.3.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.4.spmod ^
+    --staging packaging --out dist --name spw-folia-0.1.4.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 
