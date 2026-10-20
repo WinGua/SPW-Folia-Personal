@@ -32,6 +32,12 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* the nav is fixed, so anchor targets need to clear it */
+section[id],
+header[id] {
+  scroll-margin-top: 88px;
+}
+
 body {
   margin: 0;
   background: var(--ink);
