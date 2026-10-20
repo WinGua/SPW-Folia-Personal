@@ -103,15 +103,22 @@ internal class FoliaHostBridge(
             log("host already running (pid=$pid)")
             return true
         }
-        val exe = resolveHelper()
+        val exe = resolveHelper()?.let { physicalFile(it) }
         if (exe == null) {
             log("host helper not found (looked in pluginPath/host and dev checkout)")
             return false
         }
-        val web = resolveWebDir()
+        val web = resolveWebDir()?.let { physicalFile(it) }
         if (web == null) {
             log("web bundle not found (looked in pluginPath/web and dev checkout)")
             return false
+        }
+        // The helper is a .NET Framework 4.8 executable: its loader reads <exe>.config *before*
+        // managed code runs, and it does so with paths the MSIX filesystem redirection does not
+        // cover (see physicalFile()). Warn once here so the failure is diagnosable from the log.
+        if (!File(exe.parentFile, exe.name + ".config").isFile) {
+            log("helper .config not reachable at ${File(exe.parentFile, exe.name + ".config")}; " +
+                "CLR activation will likely fail with 0x80131700 (MSIX virtual path?)")
         }
         val command = mutableListOf(
             exe.absolutePath,
@@ -119,13 +126,13 @@ internal class FoliaHostBridge(
             "--fullscreen",
             "--bundle-version", FoliaPlugin.PLUGIN_VERSION
         )
-        val settingsDir = resolveSettingsDir(web)
+        val settingsDir = resolveSettingsDir(web)?.let { physicalFile(it) }
         if (settingsDir != null) {
             command += listOf("--settings-dir", settingsDir.absolutePath, "--settings-entry", SETTINGS_ENTRY)
         }
         // cwd = plugin dir so every relative path inside the helper resolves against the install
         // location; all paths we pass are absolute anyway (cwd is only a safety net).
-        val workDir = pluginPath.absoluteFile.also { it.mkdirs() }
+        val workDir = physicalFile(pluginPath.absoluteFile).also { it.mkdirs() }
         val stderrLog = File(workDir, "spw-folia-host.stderr.log")
         val stdoutLogFile = File(workDir, "spw-folia-host.stdout.log")
         log("spawn cmdline: " + command.joinToString(" "))
@@ -514,6 +521,60 @@ internal class FoliaHostBridge(
     }
 
     // ---------------------------------------------------------------- resolve ----
+
+    /**
+     * Returns the *physical* (non-virtualized) form of [file].
+     *
+     * Why this exists: on the Microsoft Store channel (MSIX) SPW runs packaged, so `pluginPath`
+     * is a virtual path (`C:\Users\<u>\AppData\Roaming\Salt Player for Windows\...`) that only
+     * resolves for processes carrying the package identity — the real bits live under
+     * `%LOCALAPPDATA%\Packages\<pkg>\LocalCache\Roaming\...`.
+     *
+     * `spw-folia-host.exe` is a .NET Framework 4.8 executable. Its loader (mscoree) opens
+     * `<exe>.config` during CLR activation using native NT paths that the MSIX filesystem
+     * redirection does **not** cover, so it gets `ERROR_PATH_NOT_FOUND` (0x80070003), concludes
+     * "Unable to find a version of the runtime to use" and aborts with exit code
+     * **-2146232576 / 0x80131700 (CLR_E_SHIM_RUNTIMELOAD)**, which the user sees as the
+     * "This application could not be started" dialog. Managed code never runs, so the helper's
+     * own stdout/stderr stay empty.
+     *
+     * Fix: pass the helper physical paths. Two steps, cheapest first:
+     *  1. `toRealPath()` / `canonicalFile` — resolves symlinks, junctions and (on MSIX) the
+     *     package's AppData redirection, because the handle is opened on the real file.
+     *  2. MSIX fallback: mirror `...\AppData\Roaming\<rest>` into
+     *     `%LOCALAPPDATA%\Packages\*\LocalCache\Roaming\<rest>`, which is where Store apps
+     *     actually keep the data.
+     */
+    private fun physicalFile(file: File): File {
+        val abs = file.absoluteFile
+        val resolved = runCatching { abs.toPath().toRealPath().toFile() }.getOrNull()
+            ?: runCatching { abs.canonicalFile }.getOrNull()
+            ?: abs
+        val out = msixPhysicalPath(resolved) ?: msixPhysicalPath(abs) ?: resolved
+        if (!out.path.equals(abs.path, ignoreCase = true)) {
+            log("physical path: ${abs.path} -> ${out.path}")
+        }
+        return out
+    }
+
+    /**
+     * MSIX fallback: re-maps an `AppData\Roaming` path onto the package's real `LocalCache`
+     * location. Returns null when the input is not an AppData\Roaming path or when no
+     * installed package holds it (e.g. the non-Store channel, where the path is already real).
+     */
+    private fun msixPhysicalPath(file: File): File? {
+        val roaming = System.getenv("APPDATA")?.takeIf { it.isNotBlank() } ?: return null
+        val localAppData = System.getenv("LOCALAPPDATA")?.takeIf { it.isNotBlank() } ?: return null
+        val path = file.path
+        if (!path.startsWith(roaming, ignoreCase = true)) return null
+        val rest = path.substring(roaming.length).trimStart('\\', '/')
+        if (rest.isEmpty()) return null
+        val packages = File(localAppData, "Packages")
+        val dirs = runCatching { packages.listFiles() }.getOrNull() ?: return null
+        return dirs.firstNotNullOfOrNull { pkg ->
+            File(pkg, "LocalCache/Roaming/$rest").takeIf { it.exists() }
+        }
+    }
 
     private fun resolveHelper(): File? {
         val candidates = mutableListOf<File>()

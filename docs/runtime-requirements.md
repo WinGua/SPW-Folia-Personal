@@ -56,6 +56,7 @@ Status: 依赖矩阵已按 **v0.2.0 发布产物** 逐项核对（代码 + 二�
 | 1 | 其它错误：窗口/WebView2 初始化失败、WebView2 浏览器进程崩溃、未处理异常 |
 | 2 | 参数错误 / bundle 目录不存在 / 没有 `index.html` |
 | 3 | **WebView2 Runtime 未安装**（或无法启动） |
+| **-2146232576** | **CLR 激活失败 `0x80131700` (CLR_E_SHIM_RUNTIMELOAD)**：系统弹「This application could not be started」对话框，托管代码一行都没跑（stdout/stderr 全空）。见 §5 案例 5 —— **不是 .NET 没装**，Store/MSIX 渠道下是辅助进程的 `.config` 路径虚拟化问题 |
 
 日志位置（都在插件安装目录 `%APPDATA%\Salt Player for Windows\workshop\plugins\spw-folia-<ver>\`）：
 
@@ -70,6 +71,7 @@ Status: 依赖矩阵已按 **v0.2.0 发布产物** 逐项核对（代码 + 二�
 | --- | --- |
 | `WebView2 Runtime not found:`（stdout）+ `exited code=3` | 装 WebView2 Runtime |
 | 系统弹 .NET Framework 安装提示 / 辅助进程完全没日志 | 装 .NET Framework 4.8 |
+| `exited code=-2146232576` + 弹「This application could not be started」+ stdout 空 | MSIX 虚拟路径导致 CLR 找不到 `.config`（案例 5），**重装 .NET 无效** |
 | `spawn failed: java.io.IOException: CreateProcess error=…` | 杀软拦截 / 文件缺失 / 目录不可写 |
 | `host helper not found` 或 `web bundle not found` | 安装不完整（native/ 或 web/ 缺文件） |
 | `bundle has no index.html` + `exited code=2` | web 目录损坏，重装插件 |
@@ -132,6 +134,35 @@ Get-ItemProperty 'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-429
    用户侧处理是重新打开一次。
 4. **环境缺失类**（不是代码 bug）：缺 WebView2 Runtime → exit 3；缺 .NET Framework 4.8 →
    .NET 安装提示后退出；这两个占「打不开/闪退」报告的绝大多数。
+5. **MSIX 虚拟路径导致 CLR 激活失败（已修，v0.2.1 起）** — **只在 Microsoft Store / MSIX 渠道出现**。
+   症状：点 Folia 后系统弹「`spw-folia-host.exe` - This application could not be started」，
+   插件日志 `host process exited code=-2146232576`，`spw-folia-host.stdout.log` 为 0 字节；
+   但**手动双击同一个 exe 却完全正常**，于是很容易被误判成「.NET Framework 坏了」而反复重装/修复 .NET（无效）。
+
+   根因（CLR 激活日志 `COMPLUS_CLRLoadLogDir` 实测）：
+
+   ```
+   Parsing config file: C:\Users\<u>\AppData\Roaming\Salt Player for Windows\...\native\spw-folia-host.exe.config
+   Config File (Open). Result:80070003        ← ERROR_PATH_NOT_FOUND
+   ERROR: Unable to find a version of the runtime to use.
+   ```
+
+   Store 版 SPW 是 MSIX 打包应用，插件数据真实存放在
+   `%LOCALAPPDATA%\Packages\Sakawish.SaltPlayerforWindows_<hash>\LocalCache\Roaming\...`，
+   而传给子进程的是**虚拟路径** `C:\Users\<u>\AppData\Roaming\Salt Player for Windows\...`（只对带包身份的
+   进程存在，真实磁盘上不存在）。.NET 加载器（mscoree）是用原生 NT 路径打开 `<exe>.config` 的，
+   **不走 MSIX 文件系统重定向** → 找不到目录 → 判定没有可用运行时 → `0x80131700`。
+
+   修复：插件在 spawn 前把 exe / web / settings / cwd 全部解析成物理路径
+   （`FoliaHostBridge.physicalFile()`：`toRealPath()` + `Packages\*\LocalCache\Roaming` 兜底映射）。
+
+   用户侧临时绕过（不想升级插件时）：建一个目录联接让虚拟路径在真实磁盘上可见——
+
+   ```powershell
+   New-Item -ItemType Junction `
+     -Path "$env:APPDATA\Salt Player for Windows" `
+     -Target "$env:LOCALAPPDATA\Packages\Sakawish.SaltPlayerforWindows_q65q631pyh094\LocalCache\Roaming\Salt Player for Windows"
+   ```
 
 ---
 
