@@ -66,5 +66,5 @@ public static final void Ϳ(String, Modifier, Painter, long, boolean, Composer, 
   同一返回类型 `J` = 打包 Color）。
 - **回退安全性**：反射路径全部包在 `runCatching`（捕获 `Throwable`，含
   `NoClassDefFoundError`）内，宿主改版后行为退化为 v0.1.11 的硬编码色，不引入新崩溃。
-- **待真机复核**（合入后）：SPW 浅色主题打开「更多」弹窗，Folia 条目应与前 4 项同为深色；
-  切回深色主题应为浅色；主题切换无需重启即生效（MutableState 订阅）。
+- **真机复核（已通过）**：SPW 浅色主题打开「更多」弹窗，Folia 条目与前 4 项同为深色；切回深色
+  主题为浅色；主题切换无需重启即生效（`MutableState` 订阅）。owner 于 2026-10-20 验收通过。

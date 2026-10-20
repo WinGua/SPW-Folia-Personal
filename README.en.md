@@ -80,6 +80,31 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   exit playback. Details: [docs/live-transparency.md](docs/live-transparency.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
 
+## What's new in v0.2.1
+
+- **Fixed: the injected Folia item was nearly invisible on SPW's light theme** — its label and icon
+  colour used to be hardcoded to `#EBEEF1`, sampled from the dark flyout. On a light theme the flyout
+  background turns light and light-on-light text basically disappears. The host's own menu items never
+  hardcode a colour: `MenuFlyoutItemCompat`'s `contentColor` parameter *defaults* to the host theme
+  palette's content colour (`androidx.compose.ui.ʰ.Ԩ(composer).Ԩ()`), which follows light/dark. The
+  injected item now reads that same colour through reflection, so it matches the four host items in both
+  themes — and because the palette lives in `MutableState`, a theme switch re-renders without a restart.
+  If reflection fails (host obfuscation names changed) it falls back to the old constant, i.e. never
+  worse than before. Byte-level evidence: [docs/verification-v0.2.1.md](docs/verification-v0.2.1.md).
+- **Fixed: helper CLR activation failure on Microsoft Store (MSIX) builds** — on the Store channel,
+  clicking Folia could show 「`spw-folia-host.exe` - This application could not be started」 with
+  `host process exited code=-2146232576` (`0x80131700`, `CLR_E_SHIM_RUNTIMELOAD`) and an empty
+  `spw-folia-host.stdout.log`, while double-clicking the very same exe worked. The plugin directory can
+  be visible to the packaged host only through an MSIX *virtual* path, but the .NET loader opens
+  `<exe>.config` with native NT paths and bypasses MSIX redirection → `Result:80070003` → no runtime
+  found. The plugin now resolves the exe / web / settings / cwd to physical paths before spawning
+  (`toRealPath()` → `canonicalFile` → absolute, plus a
+  `%LOCALAPPDATA%\Packages\*\LocalCache\Roaming\...` mapping) and logs a warning when `<exe>.config` is
+  unreachable. Non-Store installs are unaffected (identity transform). See
+  [docs/runtime-requirements.md](docs/runtime-requirements.md) §5.
+- **Runtime docs** — [docs/runtime-requirements.md](docs/runtime-requirements.md) gains this case:
+  exit code, log keyword, CLR load-log evidence and a user-side junction workaround.
+
 ## What's new in v0.2.0
 
 - **New: transparent-window style compatibility** — the transparent player window is colour-keyed:
@@ -299,6 +324,7 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | v0.1.9: mouse passthrough (`passthrough=on rects=3` → desktop click `passthrough=click at=1600,560` → catcher restored), gold button/gear/settings-page back button clickable while passthrough is on, hotkey exit leaves `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
 | v0.1.10: wheel-down crash fixed (old helper throws `OverflowException` and shows the "Microsoft .NET Framework" dialog on `WM_MOUSEWHEEL wparam=0xFF880000`; new helper passes 15/15 reflection checks and 0 dialogs / 0 error lines live) | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
 | v0.1.11: cross-thread WebView2 access in the stdin pump fixed (old helper threw `InvalidOperationException` 30 ms after `lyrics` and closed itself 2 s later with `statesReceived` stuck at 32; new helper 0 errors, `statesReceived=96`, clean `quit` and exit 0) | [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md) |
+| v0.2.1: the injected **Folia** item follows the host theme colour — host bytecode of `MenuFlyoutItemCompat`'s `contentColor` default branch (`ʰ.Ԩ(composer).Ԩ()`) matched instruction-for-instruction, and the same long is confirmed to feed `ColorFilter.tint` and the label `TextStyle`; reflection failure falls back to the v0.2.0 constant, helper CLR activation on MSIX builds is fixed by spawning physical paths | [docs/verification-v0.2.1.md](docs/verification-v0.2.1.md) |
 | v0.2.0: transparent-window style compatibility (14 styles classified native/tuned/unsupported; tempera/lumiere/pendolo/still tuned only while transparent and restored afterwards; monet and daylight lumiere turn transparency off with a panel note) + stale writer cleanup after bridge reopen + non-blocking host stdout queue (0 errors, exit 0, `dropped=0` after a 6 s stdout stall flood) | [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md) |
 | **Folia** item matches host menu typography/sparkle icon (v0.1.1); **cover-colour theming** follows the album art (v0.1.2: orange vs black cover mean RGB 165/105/66 vs 71/71/72); **v0.1.3**: mod-manager author = `azkbzxf`, inert controls removed, font family/weight + subtitle fonts effective | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
@@ -314,7 +340,7 @@ Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime"), plus **.N
 (included in Windows 10 1903 and later). Full dependency matrix, exit codes and crash triage:
 [docs/runtime-requirements.md](docs/runtime-requirements.md).
 
-1. Download `spw-folia-0.2.0.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.2.1.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -332,7 +358,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.0.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.1.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -345,8 +371,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.0.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.2.0.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.1.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 

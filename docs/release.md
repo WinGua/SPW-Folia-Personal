@@ -506,3 +506,40 @@ block the UI thread on a full stdout pipe and hang SPW). Staged payload: 1,910 f
 (web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB); `packaging/tools/verify-layout.mjs` PASS
 on the packaged artifact. See `docs/verification-v0.2.0.md`, `docs/live-transparency.md` (§4.6),
 `docs/runtime-requirements.md`, `docs/release-notes-v0.2.0.md`.
+
+### v0.2.1 release artifact (final)
+
+```
+dist/release/spw-folia-0.2.1.spmod   13,152,604 B   1,941 entries
+sha256  56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792
+manifest: Plugin-Version 0.2.1 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.2.1.spmod 94,303 B
+                                     (sha256 68facfed0fa78b6316e1dc5f4f4b70dccf2ba1ee11d80e9be03af6c2ae412c57;
+                                      host-theme-aware menu item colour + MSIX physical helper path)
+        native/spw-folia-host.exe  : 130,560 B / sha256 2aa1f6c2284754a59718c5a399f8ee2103444e4f58fb94c539e3fff8ae763ea8
+                                     (unchanged from v0.2.0)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,071,968 B / sha256 eeb8a128359531fa3f1d68d6ce6db5e808c3128f92c5f933e040ae7bae95ad34,
+                                      unchanged from v0.2.0)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.1.spmod
+```
+
+v0.2.1 is a two-fix release (PR #4, PR #5), no new features and no protocol/settings changes. Unpacked
+diff against v0.2.0: exactly **5 changed entries** — `classes/META-INF/MANIFEST.MF`,
+`FoliaHostBridge$Companion.class`, `FoliaHostBridge.class`, `FoliaMenuItemKt.class`,
+`FoliaPlugin.class`; the other 1,936 entries are byte-identical (web/native/licenses untouched).
+(1) The injected **Folia** flyout item now follows the host theme colour instead of the hardcoded
+`#EBEEF1`: host `MenuFlyoutItemCompat` (`com.xuncorp.voxzen.ui.component.Ԭ`, Blur.kt) defaults
+`contentColor` to `androidx.compose.ui.ʰ.Ԩ(composer).Ԩ()`, verified instruction-for-instruction in the
+host polyglot jar (`javap -J-Dstdout.encoding=UTF-8 -p -c`, bytecode 335–362), with the same `long`
+confirmed at the `ColorFilter.tint` (695–718) and label `TextStyle` (931) uses; the plugin reflects the
+same chain and falls back to `#EBEEF1` on any failure. (2) On MSIX (Microsoft Store) installs, the
+helper CLR activation failure `0x80131700` is fixed by resolving the exe/web/settings/cwd to physical
+paths before spawning (`physicalFile()` = `toRealPath()` → `canonicalFile` → absolute, then
+`%LOCALAPPDATA%\Packages\*\LocalCache\Roaming\...` mapping), plus a warning when `<exe>.config` is
+unreachable. `packaging/tools/verify-layout.mjs` PASS (10/10 checks, 0 console errors, 3 canvases).
+See `docs/verification-v0.2.1.md`, `docs/runtime-requirements.md` (§5 case 5),
+`docs/release-notes-v0.2.1.md`.
