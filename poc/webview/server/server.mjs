@@ -3,7 +3,14 @@
 // src/components/obs/ObsBrowserSourceApp.tsx (events: config, clock, audio).
 //
 // Query params on /obs/events: token (required, any non-empty value in this spike), mode (one of the
-// 14 built-in visualizer modes, default sonnet).
+// 14 built-in visualizer modes, default sonnet), transparent (0|1, default 0; 1 emits a
+// config.background with transparent=true so Folia's background layer renders null), bgmode (which
+// background renderer config to attach when transparent=1, default latent — only its `mode`/`common`
+// shape matters because the transparent flag short-circuits rendering), tuning (URL-encoded JSON that
+// replaces config.visualizerTunings, used by tuned.mjs to test transparent-friendly style patches),
+// cover (1 puts a small built-in data-URL PNG in config.coverUrl so cover-driven styles have art),
+// theme (URL-encoded JSON theme object replacing config.theme/subtitleTheme, used by tuned2.mjs to
+// test light-theme behaviour).
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +34,44 @@ const MIME = {
 const startedAt = Date.now();
 const clients = new Set();
 
-function configForMode(mode) {
-  return { ...CONFIG, visualizerMode: MODES.includes(mode) ? mode : 'sonnet' };
+const BG_MODES = ['latent', 'monet', 'nomand', 'sora', 'url'];
+
+// Background config the player would build from its own settings store (see rJ() in the Folia bundle):
+// { mode, common: { useCoverColorBg, opacity, disableGeometricBackground, disableVignette }, ... }.
+// The transparent flag makes every renderer return null, so only mode/common are meaningful here.
+function backgroundConfig(bgmode) {
+  const mode = BG_MODES.includes(bgmode) ? bgmode : 'latent';
+  const config = {
+    mode,
+    transparent: true,
+    common: {
+      useCoverColorBg: false,
+      opacity: 0.75,
+      disableGeometricBackground: false,
+      disableVignette: false,
+    },
+  };
+  if (mode === 'url') config.url = { items: [], selectedId: null };
+  if (mode === 'latent' || mode === 'monet' || mode === 'nomand' || mode === 'sora') config.tuning = {};
+  return config;
+}
+
+// `tuning` is a full visualizerTunings object ({<mode>: {...}}) sent straight from the caller.
+// IMPORTANT: Folia's tuningRegistry `apply` replaces the style's tuning wholesale
+// (`apply:(e,t)=>({...e,temperaTuning:t})`) and the visualizer components then read fields off that
+// object (`temperaTuning: N = <defaults>`), so a *partial* object makes every omitted field
+// undefined/falsy. Callers must therefore send the complete tuning object with only the target
+// fields flipped — tuned.mjs does exactly that.
+function configForMode(mode, { transparent, bgmode, tuning, cover, theme } = {}) {
+  const config = { ...CONFIG, visualizerMode: MODES.includes(mode) ? mode : 'sonnet' };
+  if (transparent) config.background = backgroundConfig(bgmode);
+  if (tuning) config.visualizerTunings = tuning;
+  if (cover) config.coverUrl = COVER_DATA_URL;
+  if (theme) {
+    config.theme = theme;
+    config.subtitleTheme = theme;
+  }
+  return config;
 }
 
 function sendEvent(res, name, payload) {
@@ -102,12 +145,77 @@ function serveStatic(req, res, pathname) {
   });
 }
 
+// The production OBS surface builds its EventSource URL with only the token (see yje() in the Folia
+// bundle: new URL('/obs/events') + searchParams.set('token', t)), and headless Edge sends no Referer
+// for that request either — so a `mode`/`transparent` given on the *page* URL never reaches this
+// endpoint. Callers that want per-request knobs (transparency.mjs) therefore rewrite the SSE request
+// URL from the browser side (page.route) and pass them as query params here; the query wins, and the
+// Referer is only a best-effort fallback for hosts that do send it.
+// `tuning` query param: URL-encoded JSON, e.g. {"tempera":{"showBlocks":false,...}}.
+function parseTuning(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch {
+    // Ignore malformed tuning: fall back to the shared CONFIG defaults.
+  }
+  return null;
+}
+
+// `theme` query param: URL-encoded JSON theme object (same shape as demoData.mjs THEME). Used by
+// tuned2.mjs to prove the light-theme behaviour of the lumiere dark field; absent => shared CONFIG
+// theme, so nothing changes for existing callers.
+function parseTheme(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+  } catch {
+    // Ignore malformed theme: fall back to the shared CONFIG theme.
+  }
+  return null;
+}
+
+// A tiny 64x64 PNG data URL (head + shoulders silhouette on a dark gradient) used by tuned.mjs'
+// cover case: `cover=1` puts it in config.coverUrl so the style has a real album art to draw.
+const COVER_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAC+0lEQVR4AeXBMXKVVQCA0fPduUtgkAHHwrGwoKARYUjiDMvQKmEDlpDUlCRuwAriPrSCuA3XwAADxhUgBN7L8N5/Tt98e+vcgk2yZLMs2iRLNsuiTbJkw8LNypINCzcrSzYs3CRLNsuiTXKZ/v7jyIf88PNjl6Xvvv/x3CU4Oz1yUbd/eWzdBiGEEEIIIYQQQgghhBBCCDk7PfIpzk6PEEIIIYQQQgghhBBCCCGEDGt2dnroc5ydHlqnUalUKpVKpVKpVCqVSqVSqVQqlUrl7PTQKpydHqpUKpVKpVKpVCqVSqVSqVQqlUplWJMXzx5ZpRfPHlmHWdkUlVUb1uD504fW4fnTh1Ztks2SVZplo5SVmmSzZJVm2ShlpSbZLFmlYeFmZZNUVmlYuFGpVCqVSqVSqVQqlUqlUqlUKpWd/SfWYWf/iUqlUqlUKpVKpVKpVCqVSqVSGRZuEEIIIYQQQgghhBBCCCE7+8dWaWf/GCGEEEIIIYQQQgghhJBRFEVRFEVRFEVRFEVRFEVRFMXuwbFV2D04VhRFURRFURRFURRFURRFURSDEEIIIYQQQgghhBBCCCFk9+DE59g9OEEIIYQQQgghhBBCCCGEkFEURVEURVEURVEURVEURVEURVHsPTjxKfYenCiKoiiKoiiKoiiKoiiKoiiKoujmrfvnLtFfv//qQ/Ye/OaydPPW/XMLNitLNizcrCzZsHCTfIp/v/7Jl2b886eLmmVrlAubZHvkokZRFEVRFEVRFEXx7saeL9G7G3uKoiiKoiiKoigm2S65iGHhRqVSqVQqlUqlUqm8vb7rS/b2+q5KpVKpVCqVSqUyLNysbJvKxxoWbhBCCCGEEELeXLtnE7y5dg8hhBBCCCGzbKXyUSbZTvkYoyiKoiiKoihef3XXJnn91V1FURRFURTFJNsrHzIs3KhUKpVKpVKpvLp6xyZ6dfWOSqVSqVQqlWHhZmWbVf7PsHCDEEIIIeTllds22csrtxFCCCFklq1X3muS7Zf3+Q/BhkTJN3VtkgAAAABJRU5ErkJggg==';
+
+function resolveKnobs(url, req) {
+  const pick = (name) => {
+    const direct = url.searchParams.get(name);
+    if (direct !== null) return direct;
+    const referer = req.headers.referer;
+    if (!referer) return null;
+    try {
+      return new URL(referer).searchParams.get(name);
+    } catch {
+      return null;
+    }
+  };
+  return {
+    mode: pick('mode') || 'sonnet',
+    transparent: pick('transparent') === '1',
+    bgmode: pick('bgmode') || 'latent',
+    tuning: parseTuning(pick('tuning')),
+    cover: pick('cover') === '1',
+    theme: parseTheme(pick('theme')),
+    referer: req.headers.referer ?? null,
+  };
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || '/', `http://127.0.0.1:${PORT}`);
   const pathname = url.pathname;
   if (pathname === '/obs/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ enabled: true, port: PORT, clients: clients.size }));
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({
+      enabled: true,
+      port: PORT,
+      clients: clients.size,
+      clientInfo: [...clients].map((c) => ({ mode: c.mode, transparent: c.transparent, referer: c.referer })),
+    }));
     return;
   }
   if (pathname === '/obs/events') {
@@ -123,10 +231,10 @@ const server = http.createServer((req, res) => {
       'Access-Control-Allow-Origin': '*',
     });
     res.write(': connected\n\n');
-    const mode = url.searchParams.get('mode') || 'sonnet';
-    const client = { res, mode };
+    const { mode, transparent, bgmode, tuning, cover, theme, referer } = resolveKnobs(url, req);
+    const client = { res, mode, transparent, referer };
     clients.add(client);
-    sendEvent(res, 'config', configForMode(mode));
+    sendEvent(res, 'config', configForMode(mode, { transparent, bgmode, tuning, cover, theme }));
     req.on('close', () => clients.delete(client));
     return;
   }

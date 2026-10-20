@@ -37,9 +37,16 @@ namespace SpwFolia
         private readonly System.Windows.Forms.Timer exitTimer = new System.Windows.Forms.Timer();
 
         private WebView2 webView;
-        private bool webviewReady;
-        private bool navDone;
-        private bool closedSent;
+        // v0.1.11: cross-thread flags. The stdin background thread reads webviewReady/navDone and
+        // teardown (CloseWith) races the UI thread, so all of them are volatile. Every WebView2 call
+        // is UI-thread-only now: under WebView2 Runtime 155 the WinForms `CoreWebView2` getter throws
+        // InvalidOperationException("CoreWebView2 can only be accessed from the UI thread.") when it is
+        // touched off-thread (Runtime 150 happened to tolerate it) — that exception used to kill the
+        // Folia window 2 s after a lyrics replay on the user's other device.
+        private volatile bool webviewReady;
+        private volatile bool navDone;
+        private volatile bool closedSent;
+        private volatile bool closing;
         private bool shotTaken;
         private bool settingsAutoOpened;
         private bool settingsOpenRequested;
@@ -48,8 +55,8 @@ namespace SpwFolia
         private string currentUrl;
         // Early stdin is legal (protocol §1 allows hello/settings/config/lyrics before the page is up).
         // The last lyrics/track payloads are cached so they can be replayed once navigation completes.
-        private string lastLyricsPayload;
-        private string lastTrackPayload;
+        private volatile string lastLyricsPayload;
+        private volatile string lastTrackPayload;
 
         // stdin state -> clock anchor (interpolated between 100 ms state messages)
         private readonly object stateGate = new object();
@@ -75,7 +82,7 @@ namespace SpwFolia
         private string lastTrackRaw;
 
         // host-side settings (protocol §2 `settings` out / §1 `settings` in)
-        private string settingsRaw;
+        private volatile string settingsRaw;
 
         // v0.1.7 player-page transparent background: a colour-key window (the desktop shows through
         // wherever the page paints transparent). Driven by settings.transparentPlayerBackground.
@@ -753,7 +760,12 @@ namespace SpwFolia
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            ShowCursorNow();
+            // v0.1.11: mark the teardown first. `closing` makes PostToPage / CloseWith / stdin handlers
+            // no-ops, so no background thread can start a new WebView2 call while it is being disposed
+            // (that race is a native-crash candidate: the other device saw the process die with
+            // -805306369 / 0xCFFFFFFF during teardown, without reaching the host-exit log line).
+            closing = true;
+            try { ShowCursorNow(); } catch (Exception) { }
             timer.Stop();
             exitTimer.Stop();
             if (transparencyHotkeyRegistered)
@@ -761,16 +773,17 @@ namespace SpwFolia
                 UnregisterHotKey(Handle, TransparencyHotkeyId);
                 transparencyHotkeyRegistered = false;
             }
-            DisposeInputCatcher();
+            try { DisposeInputCatcher(); } catch (Exception) { }
 
             SendClosed();
             log.Log("info", "host-exit code=" + exitCode + " reason=" + closeReason
                 + " framesPosted=" + totalFramesPosted
                 + " statesReceived=" + Interlocked.Read(ref stateCount)
                 + " lastFps=" + JsonUtil.Num(lastFps)
+                + " dropped=" + log.DroppedLines()
                 + " atMs=" + clock.ElapsedMilliseconds);
-            try { if (webView != null) webView.Dispose(); } catch (Exception) { }
-            try { audio.Dispose(); } catch (Exception) { }
+            try { if (webView != null) webView.Dispose(); } catch (Exception ex) { log.Error("webview-dispose", ex); }
+            try { audio.Dispose(); } catch (Exception ex) { log.Error("audio-dispose", ex); }
             base.OnFormClosing(e);
         }
 
@@ -1166,41 +1179,37 @@ namespace SpwFolia
         }
 
         /// <summary>
-        /// Delivers one payload to the page. Caller-agnostic: safe from any thread.
-        ///
-        /// v0.1.11: WebView2's WinForms control may only be touched from the thread that created it,
-        /// and `CoreWebView2` access is a checked operation — reading the property off-thread throws
-        /// `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.` before
-        /// any try/catch below could see it. The stdin pump calls this through HandleStdinLine, so a
-        /// lyrics/track/command line used to kill the whole pump (the reader thread unwound into its
-        /// outer catch), which stopped all host->page traffic and ended the window ~2 s later.
-        /// The null check now lives inside the try, and anything coming from another thread is
-        /// marshalled onto the UI thread first.
+        /// Posts one protocol message into the page. MUST run on the WinForms UI thread: the WebView2
+        /// managed wrapper throws <c>InvalidOperationException("CoreWebView2 can only be accessed from
+        /// the UI thread.")</c> when its members are touched from any other thread (WebView2 Runtime
+        /// 155 enforces this; Runtime 150 happened to let the same off-thread COM call pass). Callers
+        /// that can run on the stdin thread are marshalled here instead of taking the window down.
         /// </summary>
         private void PostToPage(string payload)
         {
+            if (payload == null || closing || IsDisposed) return;
             if (InvokeRequired)
             {
-                // Already marshalling with BeginInvoke keeps stdin ordering intact (queued FIFO).
-                SafeBeginInvoke(delegate { PostCore(payload); });
+                SafeBeginInvoke(delegate { PostToPage(payload); });
                 return;
             }
-            PostCore(payload);
-        }
-
-        private void PostCore(string payload)
-        {
+            if (!webviewReady || webView == null)
+            {
+                // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
+                // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
+                // track are cached by their callers and flushed on navigation completion.
+                log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
+                return;
+            }
             try
             {
-                if (!webviewReady || webView == null || webView.CoreWebView2 == null)
+                CoreWebView2 core = webView.CoreWebView2;
+                if (core == null)
                 {
-                    // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
-                    // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
-                    // track are cached by their callers and flushed on navigation completion.
-                    log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
+                    log.Log("debug", "post-page-skip reason=no-core bytes=" + Encoding.UTF8.GetByteCount(payload));
                     return;
                 }
-                webView.CoreWebView2.PostWebMessageAsJson(payload);
+                core.PostWebMessageAsJson(payload);
             }
             catch (Exception ex) { log.Error("post-page", ex); }
         }
@@ -1241,29 +1250,36 @@ namespace SpwFolia
                 while ((line = reader.ReadLine()) != null)
                 {
                     if (line.Length == 0) continue;
-                    // v0.1.11: one unexpected line must never terminate the pump. The old loop let a
-                    // per-line exception unwind all the way out of the while, which (a) stopped every
-                    // later state/lyrics/track line from reaching the page and (b) scheduled a full
-                    // window exit two seconds later - the "Folia opens then vanishes" crash class.
+                    // v0.1.11: a single malformed line, or any exception reached from a handler, used to
+                    // be fatal: it fell into the outer catch, which started the 2 s exit timer and closed
+                    // the host with code 0 (observed on the user's other device for the stdin-thread
+                    // WebView2 thread-affinity throw). stdin is the plugin's lifeline; log and continue.
                     try { HandleStdinLine(line); }
-                    catch (Exception ex) { log.Error("stdin-line", ex); }
+                    catch (Exception ex)
+                    {
+                        log.Error("stdin-line", ex);
+                        log.Log("info", "stdin-line-skip bytes=" + Encoding.UTF8.GetByteCount(line));
+                    }
                 }
                 log.Log("info", "stdin-eof");
-                if (args.ExitOnStdinClose)
-                {
-                    try { BeginInvoke((Action)ScheduleExitFromStdinEof); } catch (Exception) { }
-                }
+                if (args.ExitOnStdinClose) ScheduleExitOnUiThread();
             }
             catch (Exception ex)
             {
-                log.Error("stdin", ex);
-                try { BeginInvoke((Action)ScheduleExitFromStdinEof); } catch (Exception) { }
+                // Only a reader-level failure (broken/dead stdin pipe) can land here now.
+                log.Error("stdin-reader", ex);
+                if (args.ExitOnStdinClose) ScheduleExitOnUiThread();
             }
+        }
+
+        private void ScheduleExitOnUiThread()
+        {
+            try { BeginInvoke((Action)ScheduleExitFromStdinEof); } catch (Exception) { }
         }
 
         private void ScheduleExitFromStdinEof()
         {
-            if (IsDisposed) return;
+            if (IsDisposed || closing) return;
             exitTimer.Start();
         }
 
@@ -1275,6 +1291,7 @@ namespace SpwFolia
 
         private void HandleStdinLine(string line)
         {
+            if (closing) return;
             Dictionary<string, object> msg = null;
             try { msg = json.DeserializeObject(line) as Dictionary<string, object>; } catch (Exception) { }
             string t = msg == null ? null : JsonUtil.GetString(msg, "t");
@@ -1285,11 +1302,18 @@ namespace SpwFolia
                 log.Log("info", "stdin-hello pluginVersion=" + (JsonUtil.GetString(msg, "pluginVersion") ?? "?")
                     + " spwVersion=" + (JsonUtil.GetString(msg, "spwVersion") ?? "?"));
                 string devUrl = JsonUtil.GetString(msg, "devUrl");
-                if (!string.IsNullOrEmpty(devUrl) && webviewReady && devUrl != currentUrl)
+                if (!string.IsNullOrEmpty(devUrl))
                 {
-                    currentUrl = Program.BundleUrl(devUrl);
-                    log.Log("info", "hello devUrl override -> " + currentUrl);
-                    SafeBeginInvoke(delegate { try { webView.CoreWebView2.Navigate(currentUrl); } catch (Exception) { } });
+                    // Navigation is WebView2 work: run the whole check/navigate block on the UI thread.
+                    SafeBeginInvoke(delegate
+                    {
+                        if (closing || !webviewReady || webView == null) return;
+                        string target = Program.BundleUrl(devUrl);
+                        if (target == currentUrl) return;
+                        currentUrl = target;
+                        log.Log("info", "hello devUrl override -> " + currentUrl);
+                        try { webView.CoreWebView2.Navigate(currentUrl); } catch (Exception) { }
+                    });
                 }
             }
             else if (t == "settings")
@@ -1298,8 +1322,15 @@ namespace SpwFolia
                 if (settingsValue != null)
                 {
                     settingsRaw = settingsValue;
-                    ApplyTransparencyFromSettings();
-                    SafeBeginInvoke(SendSettingsToPage);
+                    // ApplyTransparencyFromSettings touches the form/WebView2 (window key, hotkey,
+                    // DefaultBackgroundColor) and SendSettingsToPage posts into the page: both must be
+                    // UI-thread work even though the message arrived on the stdin thread.
+                    SafeBeginInvoke(delegate
+                    {
+                        if (closing) return;
+                        ApplyTransparencyFromSettings();
+                        SendSettingsToPage();
+                    });
                 }
             }
             else if (t == "state")
@@ -1382,18 +1413,30 @@ namespace SpwFolia
             }
             else if (command == "settings")
             {
-                settingsOverlayOpen = !settingsOverlayOpen;
-                PostToPage("{\"type\":\"ui\",\"action\":\"toggle-settings\"}");
+                SafeBeginInvoke(delegate
+                {
+                    if (closing) return;
+                    settingsOverlayOpen = !settingsOverlayOpen;
+                    PostToPage("{\"type\":\"ui\",\"action\":\"toggle-settings\"}");
+                });
             }
             else if (command == "open-settings")
             {
-                settingsOverlayOpen = true;
-                PostToPage("{\"type\":\"ui\",\"action\":\"open-settings\"}");
+                SafeBeginInvoke(delegate
+                {
+                    if (closing) return;
+                    settingsOverlayOpen = true;
+                    PostToPage("{\"type\":\"ui\",\"action\":\"open-settings\"}");
+                });
             }
             else if (command == "close-settings")
             {
-                settingsOverlayOpen = false;
-                PostToPage("{\"type\":\"ui\",\"action\":\"close-settings\"}");
+                SafeBeginInvoke(delegate
+                {
+                    if (closing) return;
+                    settingsOverlayOpen = false;
+                    PostToPage("{\"type\":\"ui\",\"action\":\"close-settings\"}");
+                });
             }
             else if (command == "eval")
             {
@@ -1699,9 +1742,10 @@ namespace SpwFolia
 
         private void CloseWith(string reason, int code)
         {
+            if (closing) return; // teardown already running: keep the first reason/code
             closeReason = reason;
             exitCode = code;
-            SafeBeginInvoke(delegate { Close(); });
+            SafeBeginInvoke(delegate { try { if (!IsDisposed) Close(); } catch (Exception) { } });
         }
 
         private void Stop(int code)

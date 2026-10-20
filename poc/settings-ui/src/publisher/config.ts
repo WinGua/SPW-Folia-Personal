@@ -11,6 +11,7 @@ import {
     BACKGROUND_TUNING_DEFAULTS,
     DEFAULT_COMMON_BACKGROUND,
 } from '~/model/settings';
+import { transparentStyleTuning } from '~/model/transparencyCompat';
 import { DEFAULT_THEME } from './deriveTheme';
 
 export const CONFIG_MIN_INTERVAL_MS = 100; // ≤10 Hz, protocol §4
@@ -131,12 +132,25 @@ export const buildBackgroundConfig = (settings: SettingsSnapshot) => {
     };
 };
 
-/** Every style's tuning, keyed by mode exactly as Folia's `VisualizerTuningBundle` expects. */
-export const buildTuningBundle = (settings: SettingsSnapshot): VisualizerTuningBundle => {
+/** Every style's tuning, keyed by mode exactly as Folia's `VisualizerTuningBundle` expects.
+ *
+ *  v0.1.11: while the player window is transparent, styles that paint a large semi-transparent
+ *  plate get a render-only override merged in (see `model/transparencyCompat.ts`). The override is
+ *  applied here and not in the settings store, so it disappears as soon as transparency is off and
+ *  the user's own tuning values are never touched. */
+export const buildTuningBundle = (
+    settings: SettingsSnapshot,
+    options?: { transparent?: boolean; isDaylight?: boolean },
+): VisualizerTuningBundle => {
     const bundle: Record<string, Record<string, unknown>> = {};
     for (const [mode, tuning] of Object.entries(settings.styleTunings)) {
         if (mode === 'still') continue;
         bundle[mode] = tuning;
+    }
+    if (options?.transparent === true) {
+        const styleMode = settings.styleId as StyleMode;
+        const override = transparentStyleTuning(styleMode, { isDaylight: options.isDaylight === true });
+        if (override) bundle[styleMode] = { ...bundle[styleMode], ...override };
     }
     return bundle as VisualizerTuningBundle;
 };
@@ -165,7 +179,10 @@ export const buildConfig = ({ settings, track, theme, subtitleTheme, isDaylight,
         subtitleTheme: subtitleTheme ?? theme ?? DEFAULT_THEME,
         isDaylight,
         visualizerMode: settings.styleId as ObsBrowserSourceConfig['visualizerMode'],
-        visualizerTunings: buildTuningBundle(settings),
+        visualizerTunings: buildTuningBundle(settings, {
+            transparent: settings.transparentPlayerBackground === true,
+            isDaylight,
+        }),
         background: buildBackgroundConfig(settings) as ObsBrowserSourceConfig['background'],
         lyricsFontScale: clamp(appearance.fontScale, 0.85, 1.4),
         subtitleFontScale: clamp(subtitle.subtitleFontScale, 0.85, 1.4),

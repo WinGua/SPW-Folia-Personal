@@ -21,6 +21,7 @@ import {
 } from '~/model/settings';
 import Stage from '~/model/Stage';
 import { getStyleEntry } from '~/model/styles';
+import { getStyleTransparencyCompat } from '~/model/transparencyCompat';
 import {
     CONTROL_CARD_BG,
     FONT_SCALE_OPTIONS,
@@ -30,6 +31,7 @@ import {
     RANGE_INPUT_CLASS,
 } from '~/model/theme';
 import {
+    forceEmitSettings,
     registerSettingsUiController,
     reportHitRegions,
     setSettingsUiOpenState,
@@ -60,13 +62,18 @@ const App: React.FC<AppProps> = ({ injected }) => {
 
     /* v0.1.7: the transparent player background makes the host window click-through, so the host
      * turns it back off with a global hotkey (Ctrl+Alt+B) and calls this hook to keep the switch and
-     * the persisted setting in sync. */
+     * the persisted setting in sync.
+     * v0.1.11: the store refuses transparency for styles that cannot render it (monet, lumiere on a
+     * light theme). The host has already keyed the window by the time this runs, so push the
+     * corrected settings back explicitly instead of waiting for a store change that never happens. */
     useEffect(() => {
         const target = window as unknown as {
             __spwFoliaSetTransparent?: (on: boolean) => void;
         };
         target.__spwFoliaSetTransparent = on => {
-            useSettingsStore.getState().setTransparentPlayerBackground(on);
+            const store = useSettingsStore.getState();
+            store.setTransparentPlayerBackground(on);
+            if (on && !useSettingsStore.getState().transparentPlayerBackground) forceEmitSettings();
         };
         return () => {
             delete target.__spwFoliaSetTransparent;
@@ -92,6 +99,17 @@ const App: React.FC<AppProps> = ({ injected }) => {
             else root.style.removeProperty('--text-primary');
         };
     }, []);
+
+    /* v0.1.11: styles that cannot run under the colour key (see model/transparencyCompat.ts) are
+     * patched through CSS instead — the root flag lets app.css drop the one full-screen plate that a
+     * style has no tuning switch for (currently only `still`'s vignette). */
+    useEffect(() => {
+        const root = document.documentElement;
+        root.dataset.spwTransparent = state.transparentPlayerBackground ? 'true' : 'false';
+        return () => {
+            delete root.dataset.spwTransparent;
+        };
+    }, [state.transparentPlayerBackground]);
 
     useEffect(() => subscribeSettingsRoundTrip(), []);
     useEffect(() => setSettingsUiOpenState(open), [open]);
@@ -196,6 +214,14 @@ const App: React.FC<AppProps> = ({ injected }) => {
     }, []);
 
     const styleEntry = getStyleEntry(visualizerMode);
+    /** v0.1.11: does the selected style survive the transparent window, and does it need a downgrade? */
+    const styleCompat = getStyleTransparencyCompat(visualizerMode, { isDaylight: state.isDaylightTheme });
+    const styleLabel = t(styleEntry.labelKey) || styleEntry.labelFallback;
+    const compatNote = styleCompat === 'unsupported'
+        ? `当前样式「${styleLabel}」无法在透明窗口下显示（会留下大片键色区域），已自动关闭透明背景。切换其他样式后可重新开启。`
+        : styleCompat === 'tuned' && state.transparentPlayerBackground
+            ? `透明模式下已简化「${styleLabel}」的大面积装饰，关闭透明背景后自动恢复。`
+            : null;
     const styleDraft: StyleDraft = useMemo(() => ({
         tuning: state.styleTunings[visualizerMode],
         change: (patch: Record<string, unknown>) => state.setStyleTuning(visualizerMode, patch),
@@ -234,6 +260,8 @@ const App: React.FC<AppProps> = ({ injected }) => {
                 onTogglePassthrough={value => state.setMousePassthrough(value)}
                 passthroughLabel="鼠标穿透（操作桌面）"
                 passthroughHint="开启后点击落到桌面，两个浮标仍可点"
+                compat={styleCompat}
+                compatNote={compatNote}
             />
             <button
                 type="button"

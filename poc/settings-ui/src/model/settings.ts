@@ -23,6 +23,7 @@ import {
     DEFAULT_TILT_TUNING,
     type SmartBeatSettings,
 } from '@/types';
+import { getStyleTransparencyCompat } from './transparencyCompat';
 
 export type StyleMode =
     | 'sonnet'
@@ -191,6 +192,11 @@ interface SettingsState {
     mousePassthrough: boolean;
     setMousePassthrough: (value: boolean) => void;
 
+    /** v0.1.11: cover-derived theme lightness, mirrored from `useConfigPublisher` so the transparent
+     *  window guard can tell whether lumiere's light-theme dark field floor applies. Not persisted. */
+    isDaylightTheme: boolean;
+    setIsDaylightTheme: (value: boolean) => void;
+
     backgroundMode: BackgroundMode;
     setBackgroundMode: (mode: BackgroundMode) => void;
     backgroundTunings: Record<'monet' | 'nomand' | 'latent' | 'sora', Record<string, unknown>>;
@@ -208,12 +214,22 @@ interface SettingsState {
     resetSubtitle: () => void;
 }
 
-export const useSettingsStore = create<SettingsState>(set => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
     activeSection: 'visualizer',
     setActiveSection: activeSection => set({ activeSection }),
 
     visualizerMode: 'sonnet',
-    setVisualizerMode: visualizerMode => set({ visualizerMode }),
+    // v0.1.11: some styles paint a large semi-transparent plate (monet's portrait card, lumiere's
+    // light-theme dark field) that the colour-key window would turn into a pink haze. Selecting one
+    // of those turns the transparent window (and mouse pass-through) back off, so the style is
+    // always usable — see `model/transparencyCompat.ts`.
+    setVisualizerMode: visualizerMode =>
+        set(state => {
+            const compat = getStyleTransparencyCompat(visualizerMode, { isDaylight: state.isDaylightTheme });
+            if (compat !== 'unsupported') return { visualizerMode };
+            if (!state.transparentPlayerBackground) return { visualizerMode };
+            return { visualizerMode, transparentPlayerBackground: false, mousePassthrough: false };
+        }),
 
     previewPlaceholderId: 'default',
     setPreviewPlaceholderId: previewPlaceholderId => set({ previewPlaceholderId }),
@@ -253,7 +269,31 @@ export const useSettingsStore = create<SettingsState>(set => ({
         })),
 
     transparentPlayerBackground: false,
-    setTransparentPlayerBackground: transparentPlayerBackground => set({ transparentPlayerBackground }),
+    // v0.1.11: never let the colour key be switched on for a style that cannot render it. The panel
+    // disables the switch already; this also covers the host hotkey (Ctrl+Alt+B) and the dev console.
+    setTransparentPlayerBackground: transparentPlayerBackground =>
+        set(state => {
+            if (!transparentPlayerBackground) return { transparentPlayerBackground, mousePassthrough: false };
+            const blocked = getStyleTransparencyCompat(state.visualizerMode, {
+                isDaylight: state.isDaylightTheme,
+            }) === 'unsupported';
+            return blocked
+                ? { transparentPlayerBackground: false, mousePassthrough: false }
+                : { transparentPlayerBackground };
+        }),
+
+    isDaylightTheme: false,
+    // v0.1.11: `lumiere` only becomes unsupported once the cover-derived theme turns out to be a
+    // light one, which is known after the config publisher derives the palette. Re-check here so a
+    // light cover cannot leave the window transparent with a 94%-opaque dark field behind it.
+    setIsDaylightTheme: isDaylightTheme =>
+        set(state => {
+            if (!state.transparentPlayerBackground) return { isDaylightTheme };
+            if (getStyleTransparencyCompat(state.visualizerMode, { isDaylight: isDaylightTheme }) !== 'unsupported') {
+                return { isDaylightTheme };
+            }
+            return { isDaylightTheme, transparentPlayerBackground: false, mousePassthrough: false };
+        }),
 
     mousePassthrough: false,
     setMousePassthrough: mousePassthrough => set({ mousePassthrough }),
@@ -334,21 +374,32 @@ export const snapshotFromState = (state: SettingsState): SettingsSnapshot => ({
 export const applySnapshot = (snapshot: Partial<SettingsSnapshot> | null | undefined): void => {
     if (!snapshot || typeof snapshot !== 'object') return;
     const clean = <T>(value: T | undefined, fallback: T): T => (value === undefined || value === null ? fallback : value);
-    useSettingsStore.setState(state => ({
-        visualizerMode: clean(snapshot.styleId, state.visualizerMode),
-        smartBeat: clean(snapshot.smartBeat, state.smartBeat),
-        styleTunings: { ...state.styleTunings, ...clean(snapshot.styleTunings, {} as Record<StyleMode, Record<string, unknown>>) },
-        backgroundMode: clean(snapshot.backgroundMode, state.backgroundMode),
-        backgroundTunings: { ...state.backgroundTunings, ...clean(snapshot.backgroundTunings, {} as Record<'monet' | 'nomand' | 'latent' | 'sora', Record<string, unknown>>) },
-        commonBackground: { ...state.commonBackground, ...clean(snapshot.commonBackground, {} as CommonBackgroundSettings) },
-        appearance: { ...state.appearance, ...clean(snapshot.appearance, {} as AppearanceSettings) },
-        subtitle: { ...state.subtitle, ...clean(snapshot.subtitle, {} as SubtitleSettings) },
-        previewPlaceholderId: clean(snapshot.previewPlaceholderId, state.previewPlaceholderId),
-        lyricMotion: clean(snapshot.lyricMotion, state.lyricMotion),
-        textureResolution: clean(snapshot.textureResolution, state.textureResolution),
-        transparentPlayerBackground: clean(snapshot.transparentPlayerBackground, state.transparentPlayerBackground),
-        mousePassthrough: clean(snapshot.mousePassthrough, state.mousePassthrough),
-    }));
+    useSettingsStore.setState(state => {
+        const visualizerMode = clean(snapshot.styleId, state.visualizerMode);
+        // v0.1.11: a persisted snapshot may pair a style that cannot run transparent with the
+        // transparent window on (e.g. the persisted store predates the guard, or the persisted
+        // style was changed elsewhere). Never hydrate that combination.
+        const transparentBlocked =
+            clean(snapshot.transparentPlayerBackground, state.transparentPlayerBackground) &&
+            getStyleTransparencyCompat(visualizerMode, { isDaylight: state.isDaylightTheme }) === 'unsupported';
+        return {
+            visualizerMode,
+            smartBeat: clean(snapshot.smartBeat, state.smartBeat),
+            styleTunings: { ...state.styleTunings, ...clean(snapshot.styleTunings, {} as Record<StyleMode, Record<string, unknown>>) },
+            backgroundMode: clean(snapshot.backgroundMode, state.backgroundMode),
+            backgroundTunings: { ...state.backgroundTunings, ...clean(snapshot.backgroundTunings, {} as Record<'monet' | 'nomand' | 'latent' | 'sora', Record<string, unknown>>) },
+            commonBackground: { ...state.commonBackground, ...clean(snapshot.commonBackground, {} as CommonBackgroundSettings) },
+            appearance: { ...state.appearance, ...clean(snapshot.appearance, {} as AppearanceSettings) },
+            subtitle: { ...state.subtitle, ...clean(snapshot.subtitle, {} as SubtitleSettings) },
+            previewPlaceholderId: clean(snapshot.previewPlaceholderId, state.previewPlaceholderId),
+            lyricMotion: clean(snapshot.lyricMotion, state.lyricMotion),
+            textureResolution: clean(snapshot.textureResolution, state.textureResolution),
+            transparentPlayerBackground: transparentBlocked
+                ? false
+                : clean(snapshot.transparentPlayerBackground, state.transparentPlayerBackground),
+            mousePassthrough: transparentBlocked ? false : clean(snapshot.mousePassthrough, state.mousePassthrough),
+        };
+    });
 };
 
 /** The `VisualizerBackgroundConfig` bag the background tab reads. */

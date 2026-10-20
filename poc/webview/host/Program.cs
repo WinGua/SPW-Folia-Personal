@@ -298,12 +298,26 @@ namespace SpwFolia
         }
     }
 
-    // Thread-safe, auto-flushed JSON-lines writer on the process stdout. Safe when stdout is a pipe
-    // (the plugin redirects it); silently drops writes when the handle is invalid (double-click run).
+    // Thread-safe JSON-lines writer on the process stdout. Safe when stdout is a pipe (the plugin
+    // redirects it); silently drops writes when the handle is invalid (double-click run).
+    //
+    // v0.1.11: writes are queued and flushed by a dedicated background thread. Until v0.1.10 every
+    // log call took one global lock and flushed synchronously on the calling thread (the UI thread for
+    // fps/tick diagnostics). If the plugin briefly stopped draining stdout — for example while it was
+    // itself blocked writing the 50 KB `track` message into the host stdin pipe — the host froze inside
+    // log.Log(), stopped reading stdin, and could never notice the plugin's next messages. The user's
+    // other-device log shows exactly this: ~17 s with no host line processed, then the process died in
+    // teardown (-805306369 / 0xCFFFFFFF). A bounded queue makes logging a non-blocking operation.
     public sealed class JsonStdout : IDisposable
     {
+        private const int MaxQueuedLines = 8192;
         private readonly object gate = new object();
+        private readonly object writeGate = new object();
+        private readonly Queue<string> queue = new Queue<string>();
         private readonly StreamWriter writer;
+        private readonly Thread pump;
+        private bool stopped;
+        private long dropped;
 
         public JsonStdout()
         {
@@ -317,16 +331,70 @@ namespace SpwFolia
             {
                 writer = null;
             }
+            if (writer != null)
+            {
+                pump = new Thread(PumpLoop);
+                pump.IsBackground = true;
+                pump.Name = "spw-folia-stdout";
+                pump.Start();
+            }
+        }
+
+        /// <summary>Number of lines dropped because the pipe consumer stalled (0 in normal operation).</summary>
+        public long DroppedLines()
+        {
+            lock (gate) { return dropped; }
+        }
+
+        private void PumpLoop()
+        {
+            while (true)
+            {
+                string line;
+                lock (gate)
+                {
+                    while (queue.Count == 0 && !stopped) Monitor.Wait(gate);
+                    if (queue.Count == 0) return; // stopped and fully drained
+                    line = queue.Dequeue();
+                }
+                WriteRaw(line);
+            }
+        }
+
+        private void WriteRaw(string line)
+        {
+            if (writer == null || line == null) return;
+            try
+            {
+                // Only one thread may touch the StreamWriter at a time, but producers never take this
+                // lock: a blocked stdout consumer only ever parks the pump thread.
+                lock (writeGate) { writer.WriteLine(line); writer.Flush(); }
+            }
+            catch (Exception) { }
         }
 
         public void WriteLine(string json)
         {
-            if (writer == null) return;
+            if (writer == null || json == null) return;
             lock (gate)
             {
-                try { writer.WriteLine(json); writer.Flush(); }
-                catch (Exception) { }
+                if (!stopped)
+                {
+                    if (queue.Count < MaxQueuedLines)
+                    {
+                        queue.Enqueue(json);
+                        Monitor.Pulse(gate);
+                    }
+                    else
+                    {
+                        dropped++;
+                    }
+                    return;
+                }
             }
+            // After Dispose the pump is gone; write straight through so a late host-exit/closed line
+            // still reaches the plugin before the process ends.
+            WriteRaw(json);
         }
 
         public void Simple(string type)
@@ -353,10 +421,30 @@ namespace SpwFolia
 
         public void Dispose()
         {
+            Thread pumpRef = pump;
+            lock (gate) { stopped = true; Monitor.PulseAll(gate); }
+            if (pumpRef != null)
+            {
+                // Never join forever: a blocked pipe can park the pump inside WriteLine().
+                try { pumpRef.Join(2000); } catch (Exception) { }
+            }
+            string[] rest;
             lock (gate)
             {
-                try { if (writer != null) writer.Flush(); } catch (Exception) { }
+                rest = queue.ToArray();
+                queue.Clear();
             }
+            if (rest.Length == 0 || writer == null) return;
+            if (!Monitor.TryEnter(writeGate, 1000)) return; // pump still stuck on a dead pipe
+            try
+            {
+                for (int i = 0; i < rest.Length; i++)
+                {
+                    try { writer.WriteLine(rest[i]); } catch (Exception) { }
+                }
+                try { writer.Flush(); } catch (Exception) { }
+            }
+            finally { Monitor.Exit(writeGate); }
         }
     }
 

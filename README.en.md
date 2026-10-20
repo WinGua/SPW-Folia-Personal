@@ -244,7 +244,9 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 ## Install
 
 Requirements: Windows 10/11 x64, **Salt Player for Windows 1.19.0**, WebView2 Runtime (preinstalled on
-Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime").
+Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime"), plus **.NET Framework 4.8**
+(included in Windows 10 1903 and later). Full dependency matrix, exit codes and crash triage:
+[docs/runtime-requirements.md](docs/runtime-requirements.md).
 
 1. Download `spw-folia-0.1.10.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant

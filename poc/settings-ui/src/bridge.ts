@@ -196,11 +196,32 @@ const scheduleSettingsEmit = (snapshot: SettingsSnapshot, force = false): void =
     }, wait);
 };
 
+/** v0.1.11: `applySnapshot` drops the transparent window when the snapshot's style cannot render it
+ *  (monet, or lumiere on a light cover). Remote snapshots are guarded by `applyingRemote`, so that
+ *  correction would never be reported back and the host would keep the window keyed. Re-emit the
+ *  corrected snapshot whenever the incoming one asked for transparency but the store ended up off. */
+const emitBlockedTransparencyCorrection = (incoming: Partial<SettingsSnapshot> | null | undefined): void => {
+    if (!incoming || incoming.transparentPlayerBackground !== true) return;
+    const state = useSettingsStore.getState();
+    if (state.transparentPlayerBackground) return;
+    scheduleSettingsEmit(snapshotFromState(state), true);
+};
+
+/** v0.1.11: push the current store snapshot to the host even when it did not change. Needed when the
+ *  host switched the window into colour-key mode on its own (the Ctrl+Alt+B hotkey path) and the
+ *  selected style refuses that mode — the page has to tell the host to drop the key again. */
+export const forceEmitSettings = (): void => {
+    scheduleSettingsEmit(snapshotFromState(useSettingsStore.getState()), true);
+};
+
 /** Settings round trip: host pushes the persisted snapshot, the UI reports changes back (<=10 Hz). */
 export const subscribeSettingsRoundTrip = (): (() => void) => {
     const bridge = getBridge();
     const incoming = bridge.getSettings?.();
-    if (incoming && typeof incoming === 'object') applySnapshot(incoming as Partial<SettingsSnapshot>);
+    if (incoming && typeof incoming === 'object') {
+        applySnapshot(incoming as Partial<SettingsSnapshot>);
+        emitBlockedTransparencyCorrection(incoming as Partial<SettingsSnapshot>);
+    }
 
     const off = bridgeOn<SettingsSnapshot>('settings', snapshot => {
         applyingRemote = true;
@@ -209,6 +230,7 @@ export const subscribeSettingsRoundTrip = (): (() => void) => {
         } finally {
             applyingRemote = false;
         }
+        emitBlockedTransparencyCorrection(snapshot);
     });
 
     lastEmitJson = JSON.stringify(snapshotFromState(useSettingsStore.getState()));

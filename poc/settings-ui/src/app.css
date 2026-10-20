@@ -300,3 +300,23 @@ body.spw-injected {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
 }
+
+/* v0.1.11: a style that cannot survive the colour key disables the transparency switch instead of
+ * letting the user enable a state that turns the whole page into a pink haze. */
+.spw-player-bg-row[data-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.spw-player-bg-note--compat {
+    color: rgba(214, 168, 84, 0.85);
+}
+
+/* v0.1.11: `still` has no tuning switch for its full-screen vignette, so the injected bundle drops
+ * it while the window is colour-keyed (the plate would otherwise turn the whole window pink). The
+ * attribute substring matches the Tailwind utility in the element's class list; the shell's own
+ * wrapper div carries no class, hence the descendant (not child) combinator. */
+html[data-spw-transparent='true'] .visualizer-still div[class*='bg-[radial-gradient'] {
+    display: none !important;
+}
+

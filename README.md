@@ -214,7 +214,9 @@
 ## 安装
 
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
-Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
+Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。另需系统自带 **.NET Framework 4.8**
+（Windows 10 1903 起内置）。完整依赖矩阵、退出码与闪退排查见
+[docs/runtime-requirements.md](docs/runtime-requirements.md)。
 
 1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.11.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
