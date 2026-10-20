@@ -2,7 +2,7 @@
 
 Status: **complete** (task-8). `packaging/` holds the exact payload of the final `.spmod`; the
 assembly script, checksums, size budget and a scripted packaged-layout acceptance test are included.
-Last verified: 2026-10-20 (v0.2.0 release artifact; host `spw-folia-host.exe` 130,560 B, WebView2 150.0.4078.83).
+Last verified: 2026-10-20 (v0.2.1 release artifact; host `spw-folia-host.exe` 130,560 B, WebView2 150.0.4078.83).
 
 ## 1. What ships
 
