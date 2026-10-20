@@ -12,7 +12,7 @@ restart if asked (or disable/enable the plugin).
   `coverDataUrl` — the fullscreen theme, background tint and accent now follow the current track's
   album art. Verified with solid-colour covers: orange `#E85D04` → warm theme (mean RGB 165/105/66,
   R−B +99.5) vs near-black `#09090B` → neutral (71/71/72, R−B −0.9). See
-  [docs/verification-v0.1.2.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/verification-v0.1.2.md).
+  [docs/archive/verification-v0.1.2.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/archive/verification-v0.1.2.md).
 - **「智能动感模式」开关已删除 / Smart-beat switch removed.** The beat-detection models
   (`beat_this` / `htdemucs`, WebGPU) are not part of the WebView bundle and we do not ship a beat event
   stream, so the switch could never produce an effect. It is stripped from the settings page at build
@@ -46,7 +46,7 @@ WebView2), licenses.
   (`native/spw-folia-host.exe`, window 3200×2000, page 1776×1110, 3 canvases, 89–120 fps),
   track payloads carry the cover (104–164 KB), cursor idle-hide active.
 - Full regression list in
-  [docs/verification-v0.1.2.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/verification-v0.1.2.md).
+  [docs/archive/verification-v0.1.2.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/archive/verification-v0.1.2.md).
 
 ## Requirements & limitations
 

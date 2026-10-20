@@ -16,7 +16,7 @@
 //   {"type":"command","command":"close"|"show"|"hide"}
 // stdin EOF closes the helper (the plugin process died).
 //
-// stdout protocol: one JSON object per line, {"type": ...}; see docs/webview-spike.md.
+// stdout protocol: one JSON object per line, {"type": ...}; see docs/archive/webview-spike.md.
 //
 // C# 5 only (in-box csc.exe from .NET Framework 4.8): no interpolation / ?. / expression bodies.
 using System;

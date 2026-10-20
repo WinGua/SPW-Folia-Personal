@@ -3,7 +3,7 @@
 Status: **DONE** (2026-10-18 22:56, task-7). Menu item → real fullscreen Folia (WebView2) window fed by
 the playhead/lyrics/track of Salt Player for Windows 1.19.0, ESC closes, no orphan helper.
 
-Owner: hook-poc. Write scope: `spw-folia/**`, `docs/hook-poc.md`, this file.
+Owner: hook-poc. Write scope: `spw-folia/**`, `docs/archive/hook-poc.md`, this file.
 Host helper + web bundle are owned by task-6/task-9 (webview-spike): `packaging/native/*`,
 `poc/webview/dist/dist`, `poc/settings-ui/dist`.
 
@@ -105,7 +105,7 @@ exit ⇒ stdio EOF ⇒ helper exits by itself (verified no orphan).
 ## 5. Known fragility / caveats
 
 - **SPW pin 1.19.0 only.** Every host symbol used by the menu hook is R8-obfuscated (`ē`, `Ԭ`, `ন`,
-  `ჰ$Ϳ`, …). Re-derive them per SPW version (`docs/hook-poc.md` has the exact RES/ASM method).
+  `ჰ$Ϳ`, …). Re-derive them per SPW version (`docs/archive/hook-poc.md` has the exact RES/ASM method).
 - Helper and plugin must be shipped from the **same packaging run**: an old host exe (pre-task-9) renders
   an 8×6 viewport when spawned by javaw. Build stages `packaging/native` first by design.
 - WebView2 **user-data dir contention**: two helper instances launched by different owners on this shared

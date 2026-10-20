@@ -32,7 +32,7 @@
 - `node poc/hook/probe-live-preview.mjs`：**pass = True，11/11 checks PASS**；暂停时
   wrapper∩iframe 可见区帧差 **ratio 0.00000 / meanAbsDiff 0.00**，暂停时钟 Δ=0 ms，恢复时钟
   +1775 ms；playing/resumed 帧差 ratio 0.3322 / 0.5367。
-- 详情：[docs/verification-live-preview-ui.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/verification-live-preview-ui.md)，
+- 详情：[docs/archive/verification-live-preview-ui.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/archive/verification-live-preview-ui.md)，
   跨端契约：[docs/live-preview-iframe.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/live-preview-iframe.md)。
 
 ## 产物

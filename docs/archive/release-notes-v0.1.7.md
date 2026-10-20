@@ -25,7 +25,7 @@
 - **零插件改动** — 新字段 `transparentPlayerBackground` 走现有设置树（插件把整棵树原样持久化），
   宿主自己从 settings JSON 读该字段并切换窗口，重启后保持上次状态；`--no-transparency` 供诊断时强制关闭。
 
-机制与限制见 [live-transparency.md](live-transparency.md)，验证见 [verification-v0.1.7.md](verification-v0.1.7.md)。
+机制与限制见 [live-transparency.md](../live-transparency.md)，验证见 [verification-v0.1.7.md](verification-v0.1.7.md)。
 
 ## 验证
 

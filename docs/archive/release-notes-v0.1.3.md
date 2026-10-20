@@ -30,7 +30,7 @@ v0.1.2 已移除「智能动感模式」开关；v0.1.3 继续按
 - 字幕内容模式固定为「翻译」、和声相关字段固定关闭（无数据）。
 - 旧持久化设置自动归一化（自定义字体→无衬线、罗马音/两者→翻译、URL 背景→隐现背景）。
 
-验证：`docs/verification-v0.1.3.md`（pushConfig 断言 serif/700、mono/auto、字幕主题、DOM 无残留控件、
+验证：`docs/archive/verification-v0.1.3.md`（pushConfig 断言 serif/700、mono/auto、字幕主题、DOM 无残留控件、
 真实 SPW 安装验证、ESC 关闭无残留进程）。
 
 ## 产物

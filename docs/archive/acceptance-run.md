@@ -1,6 +1,6 @@
 > **SUPERSEDED**: 本文件是 task-13 的中途快照（旧构建 / 旧 layout）。最终产物
 > `dist/release/spw-folia-0.1.0.spmod`（sha256 `8c265dc1…`）的完整验收矩阵、soak 数据与结论见
-> **`docs/acceptance-report.md`**（canonical）。本文件保留作为过程记录。
+> **`docs/archive/acceptance-report.md`**（canonical）。本文件保留作为过程记录。
 
 # Acceptance matrix run — task-13 (installed build, real SPW 1.19.0)
 

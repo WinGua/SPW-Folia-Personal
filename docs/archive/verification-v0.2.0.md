@@ -163,7 +163,7 @@ F1/F2 修复后重建插件（`plugin-dev.spw.folia-0.2.0.spmod` 90,812 B）并�
 最终发布 `.spmod`：13,149,053 B / 1,941 entries / sha256
 `d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb`，打包后
 `node packaging/tools/verify-layout.mjs` PASS（`"pass": true`、`consoleErrors: 0`）。完整产物表见
-[release-notes-v0.2.0.md](release-notes-v0.2.0.md) 与 [release.md](release.md) 的 v0.2.0 artifact 段。
+[release-notes-v0.2.0.md](release-notes-v0.2.0.md) 与 [release.md](../release.md) 的 v0.2.0 artifact 段。
 
 ## 5. 复现命令
 

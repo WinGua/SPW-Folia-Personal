@@ -230,9 +230,11 @@ npm run build        # = vite build，产物在 dist/
 | `research/settings-ui/host-packaged-fullscreen.png` | **打包树实测**：从 `packaging/web` 注入、覆盖层打开 |
 | `research/settings-ui/pushed-config.json` | 一次实际 `pushConfig` 的完整 payload |
 | `research/settings-ui/host-ui-check-results.txt` | 真实宿主 §7.5 契约 + ⚙ 指针命中（`elementFromPoint`）回归输出（含 `gearHit`/`gearHitHidden`） |
-| `docs/images/settings-ui.jpg` | 公开 README 用：真实宿主全屏、覆盖层打开（2200 宽 JPEG q88） |
+| `docs/images/settings-ui.jpg` | 真实宿主全屏、覆盖层打开（2200 宽 JPEG q88）；本文件 §9 引用 |
 | `docs/images/fullscreen-chrome.jpg` | 公开 README 用：视觉器 + 右上 ⚙ chrome（JPEG q88） |
 | `docs/images/style-grid.png` | 公开 README 用：样式 14 两行网格裁切（样式 14 / 商籁…静止） |
+| `docs/images/transparent-background.jpg` | 公开 README 用：播放页透明背景（歌词叠加桌面，含开关面板） |
+| `docs/images/menu-folia.png` | 公开 README 用：迷你播放器「更多」菜单里的 Folia 条目 |
 
 ## 10. 验收清单
 
@@ -288,7 +290,7 @@ npm run build        # = vite build，产物在 dist/
 1. **封面取色修复**：`bridge.ts` 新增 `BridgeTrackMessage.coverDataUrl` 与
    `bridgeTrackCover(track) = track.coverUrl ?? track.coverDataUrl`；`useConfigPublisher.ts`
    的 `toPublisherTrack()` 改用 `bridgeTrackCover()`，因此宿主转发的 `coverDataUrl` 也能触发
-   `deriveThemeFromCover()`。验证见 `docs/verification-v0.1.2.md`（纯色封面实验：橙 RGB 165/105/66，
+   `deriveThemeFromCover()`。验证见 `docs/archive/verification-v0.1.2.md`（纯色封面实验：橙 RGB 165/105/66，
    黑 71/71/72）。
 2. **移除「智能动感模式」卡片**：`vite.config.ts` 新增 `stripSmartBeatCard()`（`enforce:'pre'`）——
    构建时精确替换 `VisPlaygroundSettingsPanel.tsx` 里的 `<SmartBeatSettingsCard t={t} />`（找不到即抛错），
@@ -307,4 +309,4 @@ npm run build        # = vite build，产物在 dist/
    归一化 `subtitleContentMode` 并固定和声字段为 false。此前字体族/字重/字幕字体从不进入 config。
 3. **旧值迁移**：`App.tsx` 挂载时归一化持久化设置（custom→sans、romanization/both→translation、
    url→latent），并移除自定义字体磁贴。
-4. 验证：`docs/verification-v0.1.3.md`（DOM + pushConfig 断言 + 真实 SPW 截图）。
+4. 验证：`docs/archive/verification-v0.1.3.md`（DOM + pushConfig 断言 + 真实 SPW 截图）。

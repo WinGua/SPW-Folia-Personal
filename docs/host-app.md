@@ -5,7 +5,7 @@ opens Folia mode. It owns a borderless fullscreen window, hosts Folia's producti
 bundle in WebView2, forwards the plugin's protocol-v1 JSON lines into the page (via an injected
 shim), captures WASAPI loopback audio and pushes it to the page, and reports lifecycle/errors back
 to the plugin on stdout. It contains **no music/business logic** — the plugin is the single source
-of truth. Contract: `docs/protocol.md`. Spike/decision background: `docs/webview-spike.md`.
+of truth. Contract: `docs/protocol.md`. Spike/decision background: `docs/archive/webview-spike.md`.
 
 Source: `poc/webview/host/` — `Program.cs` (CLI, JSON helpers, stdout writer, main),
 `HostForm.cs` (window, WebView2, timer tick, stdin loop, screenshots), `AudioProvider.cs`
@@ -80,7 +80,7 @@ spw-folia-host.exe [options]
 Track messages carry the album cover as a base64 data URL (`coverDataUrl`). Since v0.1.2 the host
 forwards the same value to the page under **both** `coverDataUrl` and `coverUrl` (mirror), because the
 Folia settings island's theme derivation reads `coverUrl`. Without the mirror the derived theme silently
-stayed at the default palette — see `docs/verification-v0.1.2.md`.
+stayed at the default palette — see `docs/archive/verification-v0.1.2.md`.
 | `--mode <name>` | from config | force `visualizerMode` in the embedded demo config. |
 | `--dev-settings <json-or-path>` | – | initial settings tree: inline JSON or a path to a `.json` file; used to feed the injected settings UI at startup. |
 | `--assets <dir>` | – | extra static dir mapped to `https://spw-folia-assets.local/`. |
@@ -186,7 +186,7 @@ active — **Ctrl+Alt+B**, falling back to Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Sh
 and calls `window.__spwFoliaSetTransparent(false)` so the page switch and the persisted tree stay in sync;
 (2) `backdrop-filter` layers are not drawn by the keyed composition, so the chrome and its panel switch to a flat
 background via `data-flat='true'`. Logs: `transparency mode=on|off`, `transparency hotkey=registered|off|unregistered|failed`.
-Details and limitations: `docs/live-transparency.md`; evidence: `docs/verification-v0.1.7.md`.
+Details and limitations: `docs/live-transparency.md`; evidence: `docs/archive/verification-v0.1.7.md`.
 
 ---
 
@@ -260,7 +260,7 @@ not listening yet).
 latency mean 2.7–3.4 ms / p95 6.9–7.9 ms, CPU 0.97 % of one core (audio-probe `--perf`). Startup
 cost is dominated by WebView2 bring-up (~0.5 s), not our code.
 
-Known limitations: beat FX not available (see `docs/webview-spike.md` §6); loopback is
+Known limitations: beat FX not available (see `docs/archive/webview-spike.md` §6); loopback is
 post-volume so lowering the system volume lowers visual reactivity (expected Folia behaviour);
 AGC off by default; multi-monitor selection not implemented (primary only); player-page transparency is a
 colour-key layered window (v0.1.7, `docs/live-transparency.md`), therefore mouse input passes through and
@@ -322,7 +322,7 @@ screenshot 229,341 B showing the rendered sonnet scene with track title/artist a
 - **Audio calibration**: expose a sensitivity/AGC setting if users report under-reactive visuals on
   quiet output devices (audio-probe owns measured calibration).
 - **Multi-monitor**: add `--monitor <index>` or a settings-driven picker; still primary-only.
-- **Packaging**: helper + dlls + `web/` go into the `.spmod` (layout in `docs/webview-spike.md` §7);
+- **Packaging**: helper + dlls + `web/` go into the `.spmod` (layout in `docs/archive/webview-spike.md` §7);
   keep `LICENSE`/`NOTICE` alongside per `docs/licensing.md`.
 
 ---
@@ -446,4 +446,4 @@ packaged acceptance test still passes 10/10 (`docs/release.md` §6).
 
 - `PostToPage` 在 `webviewReady == false` 或 `CoreWebView2 == null` 时记 `debug post-page-skip reason=not-ready bytes=N` 后返回，不再抛 NRE；
 - `settings`/`config` 原本就在 `NavigationCompleted` 重发；`lyrics`/`track` 现在缓存最后一份 payload，并在导航完成时回放（此前早发的 lyrics/track 会丢失，设置页输入区/歌词预览可能为空）；
-- 回归：`node tmp-verify/early-stdin-test.mjs`（250 ms 早发 hello+settings+lyrics+track+config）→ 0 NRE、3 次正确 skip、`ready` at 514 ms、页面 3 canvases 且 settings root 已挂载、正常 `closed{reason:"plugin"}`；`poc/hook/probe-live-preview.mjs` 默认/`--self-test` 两种模式复验 11/11 PASS（`docs/verification-live-preview.md` §7）。当前 exe sha256 `d0961bb65acc4fb1e4883c71594fbd004054c37bed9dd5a584a7fad81e717542`。
+- 回归：`node tmp-verify/early-stdin-test.mjs`（250 ms 早发 hello+settings+lyrics+track+config）→ 0 NRE、3 次正确 skip、`ready` at 514 ms、页面 3 canvases 且 settings root 已挂载、正常 `closed{reason:"plugin"}`；`poc/hook/probe-live-preview.mjs` 默认/`--self-test` 两种模式复验 11/11 PASS（`docs/archive/verification-live-preview.md` §7）。当前 exe sha256 `d0961bb65acc4fb1e4883c71594fbd004054c37bed9dd5a584a7fad81e717542`。

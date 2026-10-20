@@ -5,7 +5,7 @@
 //
 //   node scripts/diag-preview-health.mjs [--bundle <dir>]
 //
-// Nothing here ships; it only feeds docs/verification-live-preview-ui.md.
+// Nothing here ships; it only feeds docs/archive/verification-live-preview-ui.md.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

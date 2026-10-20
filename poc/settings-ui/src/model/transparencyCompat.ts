@@ -6,7 +6,7 @@
  * either fully opaque (glyphs, line art) or fully transparent — large semi-transparent plates
  * are not.
  *
- * Measured with the alpha probes (docs/verification-v0.2.0.md):
+ * Measured with the alpha probes (docs/archive/verification-v0.2.0.md):
  *  - `native`: the style leaves nothing but glyphs / line art on screen once Folia's own
  *    background renderer is switched off by `background.transparent` (alpha coverage < 24%).
  *  - `tuned`: the style has a full-screen or otherwise large semi-transparent layer that can be

@@ -55,4 +55,4 @@ It is not affiliated with, endorsed by, or supported by the authors of Salt Play
 - No telemetry. The plugin only reads playback state (title/artist/album/cover/lyrics/timing/audio)
   from the local SPW workshop API and renders it locally. In production the host window loads only
   local files through a WebView2 virtual host mapping (`https://spw-folia.local/`); no network
-  requests are made by the shipped page (verified offline, see `docs/webview-spike.md`).
+  requests are made by the shipped page (verified offline, see `docs/archive/webview-spike.md`).

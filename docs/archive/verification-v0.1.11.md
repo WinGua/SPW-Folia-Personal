@@ -87,7 +87,7 @@ SPW 主线程在 `synchronized` 上排队等一把永远不释放的锁 → **SP
 > 脚本与原始 stdout 未提交到仓库（所以这组数字在本仓库不可一键复现）。
 > 开发机（WebView2 **150.0.4078.83**）上 WebView2 对跨线程读 `CoreWebView2` 较宽容，无法直接复现该异常，
 > 本机只用 fixed-version 155 运行时验证过（浏览器进程自身 `BrowserProcessExited` 退出，见
-> `docs/verification-v0.2.0.md` §2.3）。§3 的现场证据来自用户机器。
+> `docs/archive/verification-v0.2.0.md` §2.3）。§3 的现场证据来自用户机器。
 
 ### 1. 修复前：必现（崩溃机，Windows 11 x64，SPW 1.19.0 + WebView2 155.0.4283.62）
 

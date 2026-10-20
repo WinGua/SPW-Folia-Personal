@@ -51,7 +51,7 @@ poc/audio/out/
 packaging/SHA256SUMS.txt
 packaging/size-report.json
 
-# hook acceptance evidence: screenshots stay local; docs/acceptance-report.md records the results
+# hook acceptance evidence: screenshots stay local; docs/archive/acceptance-report.md records the results
 poc/hook/acceptance/
 
 # transient verification fixtures (poc/hook/verify-cover.mjs outputs)

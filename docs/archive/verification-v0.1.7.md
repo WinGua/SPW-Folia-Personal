@@ -1,7 +1,7 @@
 # v0.1.7 本地验证 — 播放页透明背景（m00230 / m01012）
 
 状态：**已修好「开启透明后无法关闭」问题，9/9 自动化验证通过；产物已发布 GitHub Release v0.1.7**
-（发布说明见 `docs/release-notes-v0.1.7.md`）。
+（发布说明见 `docs/archive/release-notes-v0.1.7.md`）。
 日期：2026-10-19
 范围：`poc/settings-ui/src/chrome/PlayerBackgroundControl.tsx`（新）、`poc/settings-ui/src/model/settings.ts`、
 `poc/settings-ui/src/publisher/config.ts`、`poc/settings-ui/src/App.tsx`、`poc/settings-ui/src/app.css`、

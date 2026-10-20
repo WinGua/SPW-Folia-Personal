@@ -3,7 +3,7 @@
 Status: **SOLVED** (2026-10-18). The working approach is **`hookMethod` on the host's item-adding
 helper**; the originally planned `appendContent` is **impossible on this R8-obfuscated host build**
 (root cause below). Implemented in `spw-folia/src/main/kotlin/dev/spw/folia/FoliaPlugin.kt`
-(owner: hook-poc). Deep background: `docs/re-host.md`.
+(owner: hook-poc). Deep background: `docs/archive/re-host.md`.
 
 ## What the menu is
 
@@ -109,7 +109,7 @@ parameter types and do not need parameter names).
 - Plan B: `replaceComposable(className="com.xuncorp.voxzen.ui.component.Ԭ", methodName="\u037f",
   inClass="androidx.compose.ui.ē", parameterTypes=[F0,F2,F1], …)` and re-implement the 4 host items +
   Folia item inside our own Composable (host singletons via reflection: `PlaybackController.INSTANCE`,
-  `AppConfig.INSTANCE`, navigator; see `docs/re-host.md`).
+  `AppConfig.INSTANCE`, navigator; see `docs/archive/re-host.md`).
 - Plan C: `replaceComposable` on `PlayerMoreMenuFlyout` at its call site inside
   `com.xuncorp.voxzen.ui.player.mini.֏` (MiniPlayerMenu.kt) — same effect, different injection point.
 - Plan D: hook `MenuFlyoutScope` item append implementation instead of the builder helper (harder:

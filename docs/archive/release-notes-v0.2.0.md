@@ -33,7 +33,7 @@ v0.2.0 把两件事合在一起发布：**透明窗口现在能按样式正确�
 - **修复（v0.1.11，PR #3）：插件管道写阻塞冻结 SPW** — 旧 `sendLine` 在 `synchronized(this)` 内做阻塞
   `flush()`，宿主不读 stdin 时永久持有生命周期锁，而 `open()` 由 Compose UI 线程调用 → SPW 无响应。
   现在专职写线程 + 容量 256 的有界队列（丢最旧状态行），管道写与生命周期锁彻底解耦。
-- **新增运行时依赖文档** — [runtime-requirements.md](runtime-requirements.md)：WebView2 / .NET Framework 4.8
+- **新增运行时依赖文档** — [runtime-requirements.md](../runtime-requirements.md)：WebView2 / .NET Framework 4.8
   依赖矩阵、退出码、用户侧三步排查，以及已知真实崩溃案例。
 
 ## 验证
@@ -75,7 +75,7 @@ sha256 `eeb8a128359531fa3f1d68d6ce6db5e808c3128f92c5f933e040ae7bae95ad34`）＋ 
 
 从 v0.1.10 升级时注意：v0.1.10 在 WebView2 155+ 上打开 Folia 会闪退（v0.1.11 起修复）；v0.1.9 及更早在
 「透明背景 + 鼠标穿透」下滚轮向下必崩。系统依赖（WebView2 Runtime / .NET Framework 4.8）见
-[runtime-requirements.md](runtime-requirements.md)。
+[runtime-requirements.md](../runtime-requirements.md)。
 
 ## 已知限制
 

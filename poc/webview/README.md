@@ -2,7 +2,7 @@
 
 Everything here exists to answer one question: **can we host Folia's own production visualizer
 bundle in a native window we control?** Answer: **yes** — WebView2 helper + injected EventSource
-bridge, all 15 styles, 119–120 fps, offline. Decision record: `docs/webview-spike.md`; host
+bridge, all 15 styles, 119–120 fps, offline. Decision record: `docs/archive/webview-spike.md`; host
 implementation: `docs/host-app.md`; IPC contract: `docs/protocol.md`.
 
 ## One-command demo

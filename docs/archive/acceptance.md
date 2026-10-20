@@ -17,7 +17,7 @@ cover/theme/audio), with Folia 0.7.21's 14 lyric styles (商籁 凝彩 绘光 �
 
 ### G1 hook PoC (task-1)
 - [ ] Trivial plugin builds via `gradlew.bat plugin` → `.spmod`.
-- [ ] Local install recipe reproducible from docs/re-host.md (unzip to plugins dir, enabled.txt,
+- [ ] Local install recipe reproducible from docs/archive/re-host.md (unzip to plugins dir, enabled.txt,
       permissions.json pre-grant class-transform).
 - [ ] SPW launches with it; `logs.txt` clean.
 - [ ] 5th item "Folia" appears in mini-player 更多 menu (screenshot).

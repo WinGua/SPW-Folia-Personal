@@ -33,7 +33,7 @@
 3. `buildBackgroundConfig()` 输出 `background.transparent`，页面里 `VisualizerBackgroundRenderer` 见到 `transparent` 直接 `return null`，`ObsBrowserSourceApp` 的根 div 底色也变成 `transparent`；
 4. 宿主同时**自己**从 settings JSON 里读 `transparentPlayerBackground`（`JsonUtil.ExtractRawValue`），这样开关一动窗口立刻变透明，不必等插件回环。
 
-启动顺序：插件启动宿主时把持久化的 settings 树写在 stdin 的 `settings` 消息里；宿主解析参数后立即应用 → 上次开着透明的话，窗口从第一帧就是透明的（验证见 `docs/verification-v0.1.7.md`）。
+启动顺序：插件启动宿主时把持久化的 settings 树写在 stdin 的 `settings` 消息里；宿主解析参数后立即应用 → 上次开着透明的话，窗口从第一帧就是透明的（验证见 `docs/archive/verification-v0.1.7.md`）。
 
 ## 3. 宿主实现（`HostForm.cs`）
 
@@ -126,7 +126,7 @@ webView.DefaultBackgroundColor = Color.Black;
   `Application.ThreadException` + `AppDomain.CurrentDomain.UnhandledException`，异常改为
   `<level=error>` 协议行（`ui-thread` / `unhandled` stage），随后进程照常结束由插件重启。
 - **验证**：反射级 15/15；真机级旧二进制必现 `Microsoft .NET Framework` 弹窗、新二进制 0 弹窗；
-  详见 `docs/verification-v0.1.10.md`。
+  详见 `docs/archive/verification-v0.1.10.md`。
 
 ## 4.6 v0.2.0：透明窗口的样式兼容层
 
@@ -142,7 +142,7 @@ webView.DefaultBackgroundColor = Color.Black;
 
 覆盖只写进发布的配置（`buildTuningBundle(settings, { transparent })`），**从不写回设置存储**，所以关掉透明后
 用户原来的 tuning 立刻回来。evidence：真实宿主 + 真实 WebView2 的 6 样式探针（3200x2000，色键后洋红像素
-0.0%）与 16 项布尔构建产物回归断言（另加 3 组 tuning 覆盖参数比对）见 `docs/verification-v0.2.0.md` §1；回归脚本
+0.0%）与 16 项布尔构建产物回归断言（另加 3 组 tuning 覆盖参数比对）见 `docs/archive/verification-v0.2.0.md` §1；回归脚本
 `poc/webview/server/compat-regression.mjs`。
 
 ## 5. 已知限制

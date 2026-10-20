@@ -16,8 +16,8 @@
 - 本地 host harness 连续点击 商籁→凝彩→莫奈→时计→群唱→静止，大预览图片依次变为
   `sonnet/tempera/monet/pendolo/cappella/still.jpg`（全部 opacity 1）。
 - 真实 Salt Player for Windows 1.19.0 + v0.1.4 安装版：真实鼠标点 ⚙ 打开设置页，依次点击
-  「凝彩」「莫奈」「静止」，大预览与参数面板均同步切换（截图见 `docs/verification-v0.1.4.md`）。
-- 详情：[docs/verification-v0.1.4.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/verification-v0.1.4.md)。
+  「凝彩」「莫奈」「静止」，大预览与参数面板均同步切换（截图见 `docs/archive/verification-v0.1.4.md`）。
+- 详情：[docs/archive/verification-v0.1.4.md](https://github.com/azkbzxf/spw-folia/blob/main/docs/archive/verification-v0.1.4.md)。
 
 ## 产物
 

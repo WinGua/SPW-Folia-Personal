@@ -117,8 +117,8 @@ Scripted assembly (Lead-owned, `docs/protocol.md` order-independent):
 ```bash
 cd spw-folia && ./gradlew.bat plugin        # 1. plugin classes/ (+ lib/ if any runtime deps)
 cd .. && bash packaging/build-package.sh     # 2. re-stage web/native/licenses + checksums
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.1.spmod --staging packaging --out dist --name spw-folia-0.1.1.spmod  # 3. merge into dist/
-node poc/webview/host/out/release-candidate/run-rc.mjs   # 4. re-validate from a clean unpack
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod --staging packaging --out dist/release --name spw-folia-0.2.1.spmod  # 3. merge into dist/release
+node packaging/tools/verify-layout.mjs       # 4. packaged-layout acceptance on a clean unpack
 ```
 
 `packaging/tools/assemble-release.py` copies the Gradle-built `classes/` verbatim, maps `packaging/native/` → `native/`,
@@ -126,29 +126,9 @@ node poc/webview/host/out/release-candidate/run-rc.mjs   # 4. re-validate from a
 and fails if required files are missing or dev paths leak in. The plugin's `resolveHelper()` accepts the
 helper under `native/` and `lib/` (plus dev-only fallbacks), so either layout spawns from the installed payload.
 
-### v0.1.0 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.0.spmod   12,443,495 B   1,937 entries
-sha256 8c265dc1aca7ee5ee378b65f5b045ccba7e51536e812e399b0d9cf6bd9d46838
-classes payload sha256 81137cc97612679bf0e2093292d6faf5040c05c523e1d9cd19a41cee37e791b9
-native host sha256 aee45d4a88c7395cce72b05eb7bb14f4e07188c4a20afe8b2d460f5f4c3337b4 (cache-buster build)
-```
-
-### v0.1.1 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.1.spmod   12,450,886 B   1,938 entries
-sha256 9c4d206911eebc43869af2c0aae074efa8f672e081586946e022d7b4c89dac21
-classes payload sha256 838dc12b4b7a79cc5855f97c5c79f042fe94f6bf229d59f844dc60effe8c6c7a (menu-item styling)
-native host sha256 d75b97cbc692ab5e05b5b0cf2d2177002526849181a8787252a11cba896f71ad
-                    (cursor auto-hide + settings-overlay UI-state fix, cache-buster build)
-```
-
-v0.1.1 changes: host-style 更多 menu item (`FoliaMenuItemContent`, 19 dp sparkle + 14 sp label +
-host colour), cursor auto-hide/show (including override while the settings overlay is open), and the
-page↔host UI-state echo-loop fix that could blank/flap the settings overlay. Regression evidence:
-`poc/hook/shots/cursor-gear-click-0.png`, `docs/acceptance-report.md` addendum.
+Per-version artifact records (byte sizes, payload hashes, changed-entry lists) are no longer kept
+inline; see the release-artifact ledger at the end of this document, and `docs/archive/` for the
+historical release notes and verification reports.
 
 
 ## 4. Plugin → host spawn contract
@@ -273,273 +253,36 @@ WebView2 Runtime (system component).
    (150.0.4078.83), settings island build.
 7. No secrets in the artifact (`packaging/` contains no credentials).
 
+## Appendix: release-artifact ledger
 
-### v0.1.2 release artifact (final)
+Only the current release needs its payload hashes checked. The ledger below is the compact record of
+what each published `.spmod` was, kept so a downloaded artifact can still be verified against the
+repository; per-version change essays and full payload breakdowns live in
+[`docs/archive/`](archive/) (and in the GitHub Releases bodies, which ship `SHA256SUMS.txt` next to
+every `.spmod`).
 
+| Version | `.spmod` bytes | entries | sha256 | released |
+| --- | --- | --- | --- | --- |
+| v0.1.0 | 12,443,495 | 1,937 | `8c265dc1aca7ee5ee378b65f5b045ccba7e51536e812e399b0d9cf6bd9d46838` | 2026-10-18 |
+| v0.1.1 | 12,450,886 | 1,938 | `9c4d206911eebc43869af2c0aae074efa8f672e081586946e022d7b4c89dac21` | 2026-10-19 |
+| v0.1.2 | 12,450,848 | 1,938 | `2dc2f46b8635bd4918f45b65e9cd36d814c876e8c9f5a7827da4d0621174a0b9` | 2026-10-19 |
+| v0.1.3 | 12,405,289 | 1,937 | `16bdda573be6f9fed29780881e94feb1f5c0a6d542260c024e4f284c8a5d41ea` | 2026-10-19 |
+| v0.1.4 | 12,405,269 | 1,937 | `24ddaf34982a6acb9b92943ead1123d6dfb34ed4c9ae082c94ed2e7d1d82c04e` | 2026-10-19 |
+| v0.1.6 | 13,136,350 | 1,941 | `aacd02afb078b13d09a26930f6981740930df5dfe04343b7a9584cfd84bdcad9` | 2026-10-19 |
+| v0.1.7 | 12,970,892 | 1,941 | `5cf8eba69c9d1bb961efd160075c29b9cde52e5b30699598e5ec174106dd5138` | 2026-10-19 |
+| v0.1.8 | 12,976,142 | 1,941 | `0913914b37ba5a1b4b8db7775ebb1b7ab1621d1a069a000c43766c4c62b9ad1f` | local only |
+| v0.1.9 | 12,975,396 | 1,941 | `8ec1ffb3e4dee3c4befbc953f7d36a22ab1864e5e204439c7c16a5233257ce01` | 2026-10-19 |
+| v0.1.10 | 13,145,163 | 1,941 | `4a90d09e95ea37449882f6b7507fcfa3d0ccdf72d86dbc969b26d6426cbcf951` | 2026-10-19 |
+| v0.2.0 | 13,149,053 | 1,941 | `d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb` | 2026-10-20 |
+| **v0.2.1** | **13,152,604** | **1,941** | `56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792` | 2026-10-20 |
+
+Current release payload (v0.2.1): plugin classes 94,303 B (`68facfed…`), native host 130,560 B
+(`2aa1f6c2…`, unchanged since v0.2.0), settings island 1,071,968 B (`eeb8a128…`, unchanged since
+v0.2.0), complete Folia 0.7.21 OBS bundle + licenses. Staged payload: 1,910 files / 23.41 MB
+(web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB) against a 25 MB budget.
+Verify a downloaded artifact with:
+
+```bash
+sha256sum spw-folia-0.2.1.spmod    # compare with the ledger row and the release's SHA256SUMS.txt
+node packaging/tools/verify-layout.mjs   # packaged-layout acceptance on a clean unpack
 ```
-dist/release/spw-folia-0.1.2.spmod   12,450,848 B   1,938 entries
-sha256  2dc2f46b8635bd4918f45b65e9cd36d814c876e8c9f5a7827da4d0621174a0b9
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.2.spmod
-                                  8c6df3c4337a656f2f64cea3fcef03b587609389d75fcdf19a8e821798844155
-        native/spw-folia-host.exe  : fdac12775a62621bcf379df950a4f64149fe53bd2124281ce475c3ceef364a0a (115,712 B)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,192.9 kB, no SmartBeat card)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-```
-
-Assembly commands (from repo root):
-
-```bat
-cd spw-folia && gradlew.bat plugin && cd ..
-bash packaging/build-package.sh
-python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.2.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.2.spmod
-```
-
-v0.1.2 changes: cover-colour field fix (host mirrors `coverDataUrl`→`coverUrl`, page falls back),
-智能动感模式 card removed from the settings bundle, plus docs
-`verification-v0.1.2.md` / `known-inert-settings.md`. See `docs/release-notes-v0.1.2.md`.
-
-### v0.1.3 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.3.spmod   12,405,289 B   1,937 entries
-sha256  16bdda573be6f9fed29780881e94feb1f5c0a6d542260c024e4f284c8a5d41ea
-manifest: Plugin-Version 0.1.3 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.3.spmod 86,955 B
-        native/spw-folia-host.exe  : d75b97cbc692ab5e05b5b0cf2d2177002526849181a8787252a11cba896f71ad
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,054.1 kB, no smart-beat/beat-effect/harmony/
-                                      romanisation/custom-font/custom-background/upload controls)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-```
-
-Assembly commands (from repo root):
-
-```bat
-cd poc/settings-ui && npm run build && cd ../..
-cd spw-folia && gradlew.bat plugin && cd ..
-bash packaging/build-package.sh
-python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.3.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.3.spmod
-```
-
-v0.1.3 changes: `Plugin-Provider` set to the GitHub account `azkbzxf`; all remaining inert controls
-removed at build time (beat effects, custom/system fonts, romanisation & duet subtitles, custom/URL
-backgrounds, tempera/monet/cappella uploads); group-C settings fixed by mapping font family/weight and
-subtitle fonts into `theme` / `subtitleTheme`. See `docs/verification-v0.1.3.md`,
-`docs/known-inert-settings.md`, `docs/release-notes-v0.1.3.md`.
-
-### v0.1.4 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.4.spmod   12,405,269 B   1,937 entries
-sha256  24ddaf34982a6acb9b92943ead1123d6dfb34ed4c9ae082c94ed2e7d1d82c04e
-manifest: Plugin-Version 0.1.4 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.4.spmod 86,955 B
-        native/spw-folia-host.exe  : d75b97cbc692ab5e05b5b0cf2d2177002526849181a8787252a11cba896f71ad
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,054,069 B; preview crossfade fix)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-```
-
-v0.1.4 changes: the settings page's big style preview now follows the selected style (effect keyed on
-the target src + CSS `spw-preview-in` fade). See `docs/verification-v0.1.4.md`,
-`docs/release-notes-v0.1.4.md`.
-
-### v0.1.6 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.6.spmod   13,136,350 B   1,941 entries
-sha256  aacd02afb078b13d09a26930f6981740930df5dfe04343b7a9584cfd84bdcad9
-manifest: Plugin-Version 0.1.6 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.6.spmod 86,955 B
-        native/spw-folia-host.exe  : d0961bb65acc4fb1e4883c71594fbd004054c37bed9dd5a584a7fad81e717542
-                                     117,248 B (PostToPage not-ready guard + lyrics/track replay)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,061,824 B; preview.html; _host/preview-shim.js;
-                                     placeholder_cover*.jpg; preview assets)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.6.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.6.spmod
-(re-assembling from the same staging tree reproduced the identical sha256)
-```
-
-v0.1.5 (static Ken Burns preview) was never released; v0.1.6 replaces it with the real Folia renderer
-inside a same-origin iframe (rAF-gated pause that truly freezes the frame, static-frame fallback,
-iframe reuse across open/close). See `docs/verification-v0.1.5.md`,
-`docs/verification-live-preview-ui.md`, `docs/live-preview-iframe.md`, `docs/release-notes-v0.1.6.md`.
-
-### v0.1.7 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.7.spmod   12,970,892 B   1,941 entries
-sha256  5cf8eba69c9d1bb961efd160075c29b9cde52e5b30699598e5ec174106dd5138
-manifest: Plugin-Version 0.1.7 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.7.spmod 86,953 B
-        native/spw-folia-host.exe  : 248e1b021ddf594491b128c018151c07765b689ecc5a081054380dc55330ca2b
-                                     123,392 B (colour-key transparency + restore chip + hotkey state machine)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,066,766 B; player background panel + flat mode)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.7.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.7.spmod
-```
-
-v0.1.7 adds the player-page transparent background: the bottom-right sliders button opens a panel with
-the「播放页透明背景」switch, the host window becomes a colour-key transparent window and Folia stops
-painting its background, so lyrics float over the desktop. Because colour-key windows are mouse
-click-through, a bottom-left「恢复不透明背景 · Ctrl+Alt+B」chip (plus Ctrl+Alt+B / Ctrl+Alt+Y /
-Ctrl+Alt+P / Ctrl+Alt+Shift+B hotkeys) restores opacity and syncs the page switch. See
-`docs/verification-v0.1.7.md`, `docs/live-transparency.md`, `docs/release-notes-v0.1.7.md`.
-
-### v0.1.8 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.8.spmod   12,976,142 B   1,941 entries
-sha256  0913914b37ba5a1b4b8db7775ebb1b7ab1621d1a069a000c43766c4c62b9ad1f
-manifest: Plugin-Version 0.1.8 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.8.spmod 86,953 B
-        native/spw-folia-host.exe  : 130,560 B (transparent input catcher + click chip + hotkey toggle)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,066,831 B; clickable-transparency note)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.8.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.8.spmod
-```
-
-v0.1.8 fixes two field problems. (1) The lyrics bridge now pushes lyrics on its own 100 ms tick and
-polls the track every 200 ms, covers load right when a track is adopted (0.4 s throttle, shrunk to
-512 px), and the page keeps the previous palette while a cover is missing — so the theme and lyrics
-follow an automatic track change in ~0.4 s. (2) Transparent windows are clickable again: the helper
-adds an invisible `TransparencyInputCatcher` window (alpha = 1/255, `WS_EX_NOACTIVATE`) that forwards
-mouse messages to WebView2's `Chrome_WidgetWin_1` input window. See `docs/verification-v0.1.8.md`,
-`docs/live-transparency.md`, `docs/release-notes-v0.1.8.md`.
-
-### v0.1.9 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.9.spmod   12,975,396 B   1,941 entries
-sha256  8ec1ffb3e4dee3c4befbc953f7d36a22ab1864e5e204439c7c16a5233257ce01
-manifest: Plugin-Version 0.1.9 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.9.spmod 89,016 B
-        native/spw-folia-host.exe  : 127,488 B / sha256 5ebc3c97422debfbe02666a4dd4b07a7751b95a13627d34310443fc47b225577
-                                     (hitbox-gated input catcher + mouse passthrough, no chip window)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,069,206 B / sha256 af99b31c0941cb2c42fe953ad2fcffb932ae086195eed18634541bea5fb15216)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.9.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.9.spmod
-```
-
-v0.1.9 replaces the v0.1.7/v0.1.8 bottom-left chip with a **鼠标穿透（操作桌面）** switch in the player
-background panel and makes both chips (gold button + top-right gear) clickable in every state. The page
-reports its hot rectangles (`{"type":"hitbox","vw","vh","rects"}`); the invisible input catcher forwards
-the mouse only inside them and, while passthrough is on, hides itself / synthesises one real left click /
-restores after 220 ms for everything else. Leaving transparency resets `mousePassthrough`. See
-`docs/verification-v0.1.9.md`, `docs/live-transparency.md`, `docs/release-notes-v0.1.9.md`.
-
-### v0.1.10 release artifact (final)
-
-```
-dist/release/spw-folia-0.1.10.spmod   13,145,163 B   1,941 entries
-sha256  4a90d09e95ea37449882f6b7507fcfa3d0ccdf72d86dbc969b26d6426cbcf951
-manifest: Plugin-Version 0.1.10 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.1.10.spmod 89,015 B
-        native/spw-folia-host.exe  : 128,000 B / sha256 c2c18431426f7cd6b5076d6de0a73256ca1e5842bfb3eae73105d3cadcfee6b4
-                                     (unchecked 64-bit message-param narrowing + crash logging)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,069,206 B / sha256 af99b31c0941cb2c42fe953ad2fcffb932ae086195eed18634541bea5fb15216)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.10.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.10.spmod
-```
-
-v0.1.10 fixes the crash reported on v0.1.9: scrolling the wheel **down** while the player was transparent
-killed the helper with `System.OverflowException: 算术运算导致溢出` in
-`TransparencyInputCatcher.Forward`. Cause: `m.WParam.ToInt32()` / `m.LParam.ToInt32()` are *checked*
-narrowing conversions on x64 .NET Framework, while Win32 delivers message parameters zero-extended in the
-low dword — wheel-down delta `-120` makes `WPARAM`'s low dword `0xFF88xxxx` (bit31 set) and the conversion
-threw. The fix reads `unchecked((int)x.ToInt64())` and also corrects the wheel branch (screen coordinates
-from `LPARAM`, delta from `WPARAM`, forwarded verbatim). `Program.Main` now registers
-`Application.ThreadException` + `AppDomain.UnhandledException` so a future UI-thread exception is logged as
-a `<level=error>` protocol line instead of only raising the Windows "unhandled exception" dialog. Diff
-against v0.1.9 is exactly 4 entries: `classes/META-INF/MANIFEST.MF`, `FoliaHostBridge.class`,
-`FoliaPlugin.class`, `native/spw-folia-host.exe`. See `docs/verification-v0.1.10.md`,
-`docs/live-transparency.md`, `docs/release-notes-v0.1.10.md`.
-
-### v0.2.0 release artifact (final)
-
-```
-dist/release/spw-folia-0.2.0.spmod   13,149,053 B   1,941 entries
-sha256  d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb
-manifest: Plugin-Version 0.2.0 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.2.0.spmod 90,812 B
-                                     (sha256 aeaec79ac2d8199a880979dfc1e7f2c28f19f78bc2be22c36868ad5a43290b48;
-                                      per-session stdin queue + cleanup(reason, expectedProcess) identity guard)
-        native/spw-folia-host.exe  : 130,560 B / sha256 2aa1f6c2284754a59718c5a399f8ee2103444e4f58fb94c539e3fff8ae763ea8
-                                     (PostToPage/PostCore UI-thread marshalling, per-line stdin catch,
-                                      closing idempotence, ScheduleExitOnUiThread, JsonStdout 8192-line
-                                      non-blocking pump)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,071,968 B / sha256 eeb8a128359531fa3f1d68d6ce6db5e808c3128f92c5f933e040ae7bae95ad34,
-                                      transparent style-compat layer: 11 native / 4 tuned / monet + light lumiere unsupported)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.0.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.2.0.spmod
-```
-
-v0.2.0 ships the **transparent-window style-compatibility layer** (new feature) together with four
-crash/freeze fixes: v0.1.11's stdin-pump cross-thread crash (`PostToPage` touched `CoreWebView2` off the UI
-thread) and `sendLine` blocking-freeze of SPW (fixed by a dedicated writer thread + bounded queue), plus
-v0.2.0's per-session stdin-writer lifecycle fix (closing and reopening Folia left the old writer thread
-behind, which could poison the next session's queue) and the host's non-blocking stdout pump (v0.1.10 could
-block the UI thread on a full stdout pipe and hang SPW). Staged payload: 1,910 files / 23.41 MB
-(web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB); `packaging/tools/verify-layout.mjs` PASS
-on the packaged artifact. See `docs/verification-v0.2.0.md`, `docs/live-transparency.md` (§4.6),
-`docs/runtime-requirements.md`, `docs/release-notes-v0.2.0.md`.
-
-### v0.2.1 release artifact (final)
-
-```
-dist/release/spw-folia-0.2.1.spmod   13,152,604 B   1,941 entries
-sha256  56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792
-manifest: Plugin-Version 0.2.1 / Plugin-Provider azkbzxf / permissions class-transform,library-read
-payload plugin classes/            : gradle plugin-dev.spw.folia-0.2.1.spmod 94,303 B
-                                     (sha256 68facfed0fa78b6316e1dc5f4f4b70dccf2ba1ee11d80e9be03af6c2ae412c57;
-                                      host-theme-aware menu item colour + MSIX physical helper path)
-        native/spw-folia-host.exe  : 130,560 B / sha256 2aa1f6c2284754a59718c5a399f8ee2103444e4f58fb94c539e3fff8ae763ea8
-                                     (unchanged from v0.2.0)
-        web/                       : complete Folia 0.7.21 OBS bundle + settings island
-                                     (settings-ui.js 1,071,968 B / sha256 eeb8a128359531fa3f1d68d6ce6db5e808c3128f92c5f933e040ae7bae95ad34,
-                                      unchanged from v0.2.0)
-        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
-assembly: bash packaging/build-package.sh, then
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.2.1.spmod
-```
-
-v0.2.1 is a two-fix release (PR #4, PR #5), no new features and no protocol/settings changes. Unpacked
-diff against v0.2.0: exactly **5 changed entries** — `classes/META-INF/MANIFEST.MF`,
-`FoliaHostBridge$Companion.class`, `FoliaHostBridge.class`, `FoliaMenuItemKt.class`,
-`FoliaPlugin.class`; the other 1,936 entries are byte-identical (web/native/licenses untouched).
-(1) The injected **Folia** flyout item now follows the host theme colour instead of the hardcoded
-`#EBEEF1`: host `MenuFlyoutItemCompat` (`com.xuncorp.voxzen.ui.component.Ԭ`, Blur.kt) defaults
-`contentColor` to `androidx.compose.ui.ʰ.Ԩ(composer).Ԩ()`, verified instruction-for-instruction in the
-host polyglot jar (`javap -J-Dstdout.encoding=UTF-8 -p -c`, bytecode 335–362), with the same `long`
-confirmed at the `ColorFilter.tint` (695–718) and label `TextStyle` (931) uses; the plugin reflects the
-same chain and falls back to `#EBEEF1` on any failure. (2) On MSIX (Microsoft Store) installs, the
-helper CLR activation failure `0x80131700` is fixed by resolving the exe/web/settings/cwd to physical
-paths before spawning (`physicalFile()` = `toRealPath()` → `canonicalFile` → absolute, then
-`%LOCALAPPDATA%\Packages\*\LocalCache\Roaming\...` mapping), plus a warning when `<exe>.config` is
-unreachable. `packaging/tools/verify-layout.mjs` PASS (10/10 checks, 0 console errors, 3 canvases).
-See `docs/verification-v0.2.1.md`, `docs/runtime-requirements.md` (§5 case 5),
-`docs/release-notes-v0.2.1.md`.

@@ -7,12 +7,12 @@ faithfully as possible. Publish to GitHub (`azkbzxf/spw-folia`, topic `salt-play
 
 Related docs (authoritative order):
 - `docs/protocol.md` — **implementation contract v1** for plugin↔host↔page (frozen; changes require Lead approval).
-- `docs/re-host.md` — SPW host RE facts, local plugin install/test loop, build env.
+- `docs/archive/re-host.md` — SPW host RE facts, local plugin install/test loop, build env.
 - `docs/hook-target.md` — exact SPW 1.19.0 hook target for the 更多 menu + fallbacks.
 - `docs/folia-spec/README.md` (+ style-map / settings-ui / tunings / runtime-contracts / fullscreen-shell / assets) —
   Folia behavior spec extracted from source (14 styles, settings, audio scale, theme, transitions).
-- Spike/impl docs: `docs/webview-spike.md`, `docs/host-app.md`, `docs/settings-ui-impl.md`, `docs/audio-timeline.md`,
-  `docs/hook-poc.md`.
+- Implementation docs: `docs/host-app.md`, `docs/settings-ui-impl.md`, `docs/audio-timeline.md`.
+- Decision records (frozen): `docs/archive/webview-spike.md`, `docs/archive/hook-poc.md`.
 - `docs/architecture.md` (this file) — how the pieces fit.
 
 ## 1. Core decisions

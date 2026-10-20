@@ -121,13 +121,13 @@ Get-ItemProperty 'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-429
    异常从 `WndProc` 逃出 → WinForms 弹「Microsoft .NET Framework」未处理异常对话框 → 辅助进程退出。
    v0.1.10 改为 `unchecked((int)…ToInt64())` 并注册 `Application.ThreadException` /
    `AppDomain.UnhandledException` 输出协议错误行。**仍在 0.1.9 及更早的用户是最可能的「有些用户会闪退」来源。**
-   详见 `docs/verification-v0.1.10.md`、`docs/release-notes-v0.1.10.md`。
+   详见 `docs/archive/verification-v0.1.10.md`、`docs/archive/release-notes-v0.1.10.md`。
 2. **v0.1.10 在 WebView2 155+ 的 stdin 泵崩溃（已修）** — 打开 Folia 后歌词重放时，插件 stdin 线程
    直接读 `webView.CoreWebView2` 抛 `InvalidOperationException: CoreWebView2 can only be accessed from
    the UI thread.`，读取线程终止 → 2 秒后窗口自关；同一故障还会让插件管道写阻塞、拖死 SPW UI 线程
    （「未响应」）。旧版 WebView2（如参考机 150.0.4078.83）对跨线程属性读取更宽容，所以只在 155+
    用户机器上必现。v0.1.11 改为线程封送 + 专职写线程，v0.2.0 一并发布；详见
-   `docs/verification-v0.1.11.md`、`docs/release-notes-v0.2.0.md`。
+   `docs/archive/verification-v0.1.11.md`、`docs/archive/release-notes-v0.2.0.md`。
 3. **WebView2 浏览器进程偶发退出（未修）** — `BrowserProcessExited reason=Unexpected`，
    症状为窗口用着用着消失、日志出现 `webview process-failed` + `closed reason=error` + exit 1。
    发布产物上出现过 1 次、开发期另 1 次，15 分钟压测未复现；当前没有自动重试（属后续任务），

@@ -71,7 +71,7 @@ release `.spmod` installed exactly as delivered:
 - **Release-candidate payload**: unpacked in a clean directory it spawns from relative paths and passes 19/19
   layout/protocol checks with 0 page errors.
 
-Full evidence: `docs/acceptance-report.md`, `docs/plugin-integration.md`, `docs/release-candidate.md`,
+Full evidence: `docs/archive/acceptance-report.md`, `docs/archive/plugin-integration.md`, `docs/archive/release-candidate.md`,
 `docs/host-app.md`, `docs/audio-timeline.md`.
 
 ## Known limitations (v1)

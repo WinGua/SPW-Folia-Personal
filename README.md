@@ -11,254 +11,85 @@
 
 ![SPW 迷你播放器「更多」菜单中的 Folia 条目](docs/images/menu-folia.png)
 
-![Folia 全屏模式与注入的 Folia 设置页面](docs/images/settings-ui.jpg)
-
 <p align="center"><img src="docs/images/fullscreen-chrome.jpg" width="88%" alt="Folia 全屏可视化器与右上角 ⚙ 设置按钮"></p>
 
-<p align="center"><img src="docs/images/transparent-background.jpg" width="88%" alt="播放页透明背景：窗口真透明，歌词与特效叠加在桌面之上，右下角是「播放页透明背景」开关"></p>
+<p align="center"><img src="docs/images/transparent-background.jpg" width="88%" alt="播放页透明背景：歌词直接叠加在桌面上，右下角为开关面板"></p>
+
+<div align="center"><sub>播放页透明背景：Folia 只画歌词与特效，窗口其余部分是真正的透明区域（右下角为开关面板）。</sub></div>
 
 ## 功能
 
-- **模组管理作者名**：`azkbzxf`（GitHub 账号，v0.1.3 起）。
-- **直接运行真正的 Folia，而非移植** — 插件在 WebView2 中承载 Folia 0.7.21 的生产级
-  OBS 浏览器源产物；每种样式都是 Folia 原始代码，因此动态、辉光、逐字时间轴、背景与转场都与
-  Folia 像素级一致。
+- **直接运行真正的 Folia，而非移植** — 插件在 WebView2 中承载 Folia 0.7.21 的生产级 OBS 浏览器源
+  产物；每种样式都是 Folia 原始代码，动态、辉光、逐字时间轴、背景与转场都与 Folia 像素级一致。
 - **全部 14 种歌词样式**：商籁 (sonnet) · 凝彩 (tempera) · 绘光 (lumiere) · 流光 (classic) ·
   心象 (cadenza) · 云阶 (partita) · 浮名 (fume) · 倾诉 (tilt) · 回环 (claddagh) · 莫奈 (monet) ·
   时计 (pendolo) · 群唱 (cappella) · 镜台 (diorama) · 静止 (still)。
-- **Folia 设置页 1:1 还原** —「歌词样式」窗口（歌词动画 / 背景 / 字体 / 字幕 四个标签页、
-  14 样式实时网格、默认 重置、纹理分辨率、镜头运动强度、文字动势、各样式专属调节项），
-  复用 Folia 自己的 React 组件。
-- **设置页实时大预览**（v0.1.6）— 「歌词样式」左侧大预览不是静态截图，而是同源 iframe 里的
-  真实 Folia 渲染器逐帧绘制：样式、纹理分辨率、镜头运动、字体、背景、主题改动即时生效，
-  暂停/播放按钮真正冻结和恢复画面。
-- **播放页透明背景**（v0.1.7，v0.1.9 起可切换鼠标穿透）— 全屏播放页右下角的圆形「调音台」按钮里可开关
-  「播放页透明背景」：开启后宿主窗口变成真正的透明窗口，Folia 不再绘制背景，歌词与特效直接叠加在桌面或
-  其它窗口之上（直播 / OBS 叠加场景）。面板第二行「鼠标穿透（操作桌面）」打开后，点击落向桌面/其它应用，
-  而右下角圆钮与右上角齿轮在任何状态下都保持可点。开关随设置树持久化。
-- **透明窗口样式兼容**（v0.2.0）— 透明窗口是色键合成，页面画出的半透明装饰会与键色混合成粉雾。v0.2.0 为
-  14 种样式逐一标注透明兼容级别：11 种可直接透明显示；tempera / lumiere / pendolo / still 在透明开启时
-  自动叠加渲染期精简参数（只影响透明期间，关闭透明立即恢复用户原样）；monet（以及浅色主题下的 lumiere）
-  的大面积半透明层无法移除——选中这些样式时自动关闭透明与鼠标穿透，并在面板里说明原因，避免整屏品红。
-- **封面取色** — 主题、背景与强调色由当前歌曲封面派生（v0.1.2 修复），随封面切换实时变化。
-- **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自
-  SPW 播放 API 加一条平滑插值时间轴。
-- **音频响应** — 在原生辅助进程内完成 WASAPI 系统回环采集，输出与 Folia 兼容的 1024-bin 频谱和
-  5 段 gamma 映射电平（power/bass/lowMid/mid/vocal/treble）。
-- **无 HTTP 服务、无网络** — 辅助进程把本地 bundle 映射到虚拟 https 主机，一个极小的注入 shim
-  通过 stdin/stdout 直接把数据喂给 Folia 的 EventSource 协议。
-- **AGPL-3.0 完整源码** — 插件（Kotlin）、辅助进程（C#）、设置 UI（React/TS）与打包脚本
-  全部在本仓库中。
+- **Folia 设置页 1:1 还原** —「歌词样式」窗口（歌词动画 / 背景 / 字体 / 字幕 四个标签页、14 样式
+  实时网格、默认 重置、纹理分辨率、镜头运动强度、文字动势、各样式专属调节项），复用 Folia 自己的
+  React 组件；左侧大预览就是同源 iframe 里逐帧运行的真实渲染器。
+- **播放页透明背景 + 鼠标穿透** — 全屏页右下角圆形按钮面板里可开关「播放页透明背景」：宿主窗口
+  变成真正的透明窗口，Folia 停止绘制背景，歌词与特效直接叠加在桌面或其它窗口之上（直播 / OBS 叠加
+  场景）。第二行「鼠标穿透（操作桌面）」让点击落向桌面，而圆钮、齿轮与设置页始终可点。开关随设置树
+  持久化，**Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B）可随时恢复不透明。
+  透明窗口是色键合成，14 种样式按兼容级别分为直接支持（11 种）、透明期自动精简（凝彩 / 绘光 / 时计 /
+  静止，关闭透明即恢复用户原样）与不兼容（莫奈、浅色主题下的绘光——选中时自动关闭透明并说明原因）。
+- **封面取色** — 主题、背景与强调色由当前歌曲封面派生，随封面切换实时变化。
+- **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自 SPW 播放
+  API 加一条平滑插值时间轴。
+- **音频响应** — 原生辅助进程内完成 WASAPI 系统回环采集，输出与 Folia 兼容的 1024-bin 频谱和 5 段
+  gamma 映射电平（power/bass/lowMid/mid/vocal/treble）。
+- **无 HTTP 服务、无网络** — 辅助进程把本地 bundle 映射到虚拟 https 主机，一个极小的注入 shim 通过
+  stdin/stdout 直接把数据喂给 Folia 的 EventSource 协议。
+- **AGPL-3.0 完整源码** — 插件（Kotlin）、辅助进程（C#）、设置 UI（React/TS）与打包脚本全部在本仓库中。
 
 ### v1 限制
 
-- **智能动感的节拍特效未包含在 v1**：Folia OBS 接口不暴露节拍事件，而 Folia 的
-  节拍模型（`beat_this` / `htdemucs`，约 133 MB）运行在 Folia 的 Electron 主进程里，不在其 web
-  bundle 中。关闭智能动感时（Folia 的默认值），所有样式的渲染与 Folia 完全一致。
-  **v0.1.2 / v0.1.3 起设置页陆续移除了所有无法生效的开关与选项**（智能动感、动感效果、罗马音/
-  和声字幕、自定义字体、自定义背景、素材上传等）；保留的控件均会产生实际效果。清单见
+- **智能动感的节拍特效未包含**：Folia OBS 接口不暴露节拍事件，节拍模型（`beat_this` / `htdemucs`，
+  约 133 MB）运行在 Folia 的 Electron 主进程里，不在其 web bundle 中。关闭智能动感时（Folia 默认值），
+  所有样式的渲染与 Folia 完全一致。设置页已移除所有无法生效的开关与选项（智能动感、动感效果、罗马音 /
+  和声字幕、自定义字体、自定义背景、素材上传等），保留的控件均会产生实际效果——清单见
   [docs/known-inert-settings.md](docs/known-inert-settings.md)。
 - **仅支持 Windows**（辅助进程依赖 WebView2 + Windows WASAPI）。
-- **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆
-  变化），在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
+- **锁定 Salt Player for Windows 1.19.0** — 菜单 hook 针对该宿主版本（SPW 内部名称随版本混淆变化），
+  在其他版本上插件会拒绝安装 hook。见 [docs/hook-target.md](docs/hook-target.md)。
 - 不写入音乐库；插件只读取播放状态与当前歌曲/歌词/封面。
-- **透明模式默认会捕获鼠标**：透明窗口整页盖在桌面上，点哪里都先给 Folia（v0.1.8 起页面控件可点）。
-  想在透明状态下操作桌面/其它窗口，打开面板里的「**鼠标穿透（操作桌面）**」即可；右下角圆钮与右上角
-  齿轮（以及它们打开的面板/设置页）永远可点。也可以按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P /
-  Ctrl+Alt+Shift+B）或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
 
-## v0.2.1 更新内容
+## 版本历史
 
-- **修复：浅色主题下「更多」菜单里的 Folia 条目几乎不可见** — 注入项的文字与图标颜色此前硬编码为
-  深色弹窗的采样值 `#EBEEF1`，SPW 浅色主题下弹窗底色变浅，浅色文字直接「隐形」。宿主自己的菜单项
-  并不写死颜色：`MenuFlyoutItemCompat` 的 `contentColor` 参数默认值就是宿主主题面板的内容色
-  （`androidx.compose.ui.ʰ.Ԩ(composer).Ԩ()`），随浅/深主题切换。现在注入项通过反射走同一条调用链
-  读取宿主主题色（面板颜色存在 `MutableState` 里，组合期读取即订阅，主题切换会自动重组），
-  反射失败时回退旧常量。字节级证据见 [docs/verification-v0.2.1.md](docs/verification-v0.2.1.md)。
+每个版本的可下载产物（`.spmod` + `SHA256SUMS.txt`）在
+[GitHub Releases](https://github.com/azkbzxf/spw-folia/releases)。仓库内不再保留逐版发布说明；
+需要复盘时见 [docs/archive/](docs/archive/)（历史发布说明、验证报告与验收证据，仅供追溯，无需阅读）。
 
-## v0.2.0 更新内容
-
-- **新特性：透明窗口样式兼容** — 透明播放窗口用色键实现：页面画出的 alpha < 1 像素会和键色（纯品红）
-  混合，在真实窗口中变成粉雾。v0.2.0 按「能否在透明窗口下干净显示」把 14 种样式分为三级：
-  **native**（11 种）关掉 Folia 背景后只剩字形/线稿，直接支持透明；**tuned**（凝彩 tempera、绘光
-  lumiere、时计 pendolo、静止 still）自带大面积半透明装饰，透明开启时由发布器自动叠加渲染期 tuning
-  （不写入用户设置，关闭透明后原样恢复）；**unsupported**（莫奈 monet，以及浅色主题下的 lumiere）
-  任何调节都无法移除其半透明层——选中时自动关闭透明背景与鼠标穿透，并在面板里说明原因，避免整屏键色。
-  判定见 `poc/settings-ui/src/model/transparencyCompat.ts`，探针数据与回归见
-  [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md)。
-- **修复：关闭再打开 Folia 后旧的 stdin 写线程泄漏** — 窗口关闭后 bridge 实例会被复用（`onClosed` 只
-  记录日志，`stop()` 仅在插件禁用/删除时调用），旧写线程仍停在空队列的 `take()` 上，队列又是实例共享的，
-  重新打开时旧线程可能取走新会话的行。现在 stdin 队列与写线程改为**每会话独立**：`open()` 先显式退役旧
-  writer（`interrupt` + `join`），`cleanup()` 统一走 `stopStdinWriter()`，旧线程也不可能再污染新队列。
-  `cleanup()` 同时带**会话身份校验**（只清理自己那个 helper 进程）并与 `open()`/`stop()` 共用生命周期锁，
-  旧会话迟到的退出清理不会误清刚重开的窗口。
-- **加固：宿主 stdout 改为非阻塞有界队列** — 辅助进程的协议行/log 行原本在调用线程上同步写管道并
-  flush；插件一旦暂停读取 stdout，宿主 UI 线程就会冻在 `log.Log()` 里（v0.1.10 现场曾出现 ~17 s 无
-  host 行、随后 `0xCFFFFFFF` 退出的记录）。现在改由专职 `spw-folia-stdout` 线程 + 8192 行有界队列
-  输出，`host-exit` 日志额外记录丢弃行数（`dropped=`）。
-- **依赖与排障文档** — 新增 [docs/runtime-requirements.md](docs/runtime-requirements.md)：WebView2
-  Runtime / .NET Framework 4.8 / SPW 1.19.0 的依赖矩阵、退出码含义与闪退排查清单。安装要求中补充
-  系统自带 **.NET Framework 4.8**（Windows 10 1903 起内置）。
-- v0.1.11 的两项崩溃修复一并包含在本版中（见下一节）。
-
-## v0.1.11 更新内容
-
-- **修复：打开 Folia 后几秒内窗口必闪退，并可连带 SPW 卡死** — 辅助进程的 stdin 泵跑在后台线程上，但 `lyrics`/`track`/`command` 分支直接调用 `webView.CoreWebView2`（连读属性都在 UI 线程检查之内），必抛 `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.`，整个 stdin 读取线程就此终止，2 秒后窗口按「插件退出」流程自杀；负载高时被 Windows 判为挂起（Application Hang 1002）强制结束。现在 `PostToPage` 按 `InvokeRequired` 自动封送到 UI 线程，且 stdin 循环改为**逐行**捕获异常——单条协议消息的异常只丢该行（管道/读取级错误仍按退出流程处理）。
-- **修复：辅助进程停止读取时插件可冻结 SPW** — `FoliaHostBridge.sendLine` 原来在共享监视器内做阻塞式管道写，管道被填满后（实测 155 KB、上限约 213 KB 的 track 消息）写线程永久阻塞并握锁不放，而 `open()` 恰由 Compose UI 线程调用，SPW 主线程随之冻结。现在 stdin 由专职写线程 + 有界队列（满则丢最旧状态行；正常负载下丢的是 state，极端溢出时可能丢 settings，重开窗口会重发）驱动，SPW 的 UI/生命周期线程不再可能因管道写而阻塞，只有专职写线程自行承受背压（`open/stop` 最多 `join` 500 ms）。
-- 证据链（崩溃现场三条 `Application Hang (1002)`、两次 `InvalidOperationException`、退出码 `0xCFFFFFFF`）与修复前后同脚本复现对比见 [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md)。
-
-## v0.1.10 更新内容
-
-- **修复：透明模式下滚轮向下导致辅助进程崩溃** — v0.1.9 的输入捕获窗口用 `IntPtr.ToInt32()`
-  读消息参数；在 x64 上这是带溢出检查的窄化转换，而 Win32 把参数零扩展投递，滚轮向下
-  （delta `-120` ⇒ `WPARAM` 低 32 位 `0xFF88xxxx`，bit31 为 1）于是抛出
-  `OverflowException: 算术运算导致溢出`，弹出「Microsoft .NET Framework」对话框并退出。
-  现改为 `unchecked((int)x.ToInt64())`，并修正滚轮分支取错字段（坐标应取自 `LPARAM`、delta 取自 `WPARAM`）。
-- **未处理异常写进日志** — 辅助进程注册 `Application.ThreadException` 与
-  `AppDomain.UnhandledException`，今后 UI 线程异常会输出 `level=error` 协议行，不再只有一张弹窗截图。
-- 细节见 [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md)。
-
-## v0.1.9 更新内容
-
-- **面板新增「鼠标穿透（操作桌面）」** — 右下角金色圆钮打开的面板里，第二行就是穿透开关（只有透明背景
-  开启时出现）。默认关闭：透明窗口仍可点页面（v0.1.8 行为）；打开后点击落向桌面/其它窗口，
-  而右下角圆钮、右上角齿轮、它们打开的面板与设置整页仍然可点。
-- **两个浮标永远可点** — 页面把自己的热区（圆钮、齿轮、打开中的面板、设置整页）报给宿主，透明窗口上的
-  不可见输入捕获窗口只在热区内转发鼠标；热区之外（穿透开启时）改为「合成一次真实左键 → 220 ms 后恢复」，
-  所以同一个透明窗口既能点 Folia 又能点桌面。
-- **删除左下角 chip** — v0.1.7/v0.1.8 的「恢复不透明背景」浮标窗口已移除，画面不再被额外窗口遮挡；
-  **Ctrl+Alt+B** 双向切换保留，退出透明时 `mousePassthrough` 自动复位，下次进入透明不会停留在穿透态。
-- 机制见 [docs/live-transparency.md](docs/live-transparency.md)，验证见 [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md)。
-
-## v0.1.8 更新内容
-
-- **切歌即换词** — 之前歌词只在「曲目数据变化」时才推给页面，SPW 自动切歌要等好几秒才换词；
-  现在宿主桥每 100 ms 独立比对歌词并推送（真机 track 与 lyrics 相差 ~2 ms），曲目探询也从 1 s 提速到 200 ms。
-- **封面/主题跟得上** — 切歌瞬间就发起封面加载（0.4 s 节流、按曲目去重），大封面先缩到 512 px
-  再转 data URL；真机从切歌到带封面的 track 约 0.4 s（原来最坏 3–4 s）。页面侧在封面未到时
-  保留上一首配色，封面到达后再推导主题，不再闪回默认夜色。
-- **透明窗口内可点击** — 透明模式不再「整窗穿透、只能靠热键」：宿主加了一层不可见输入捕获窗口
-  （alpha=1/255、`WS_EX_NOACTIVATE`），把鼠标事件转发给 WebView2 的输入子窗口，所以透明时右下角
-  圆钮、面板、开关、齿轮都能正常点（真机：透明中点击开关 → 立即恢复不透明）。
-- **逃生通道保留** — 左下角 chip 与 **Ctrl+Alt+B** 双向切换仍在，页面卡住时可用；chip 文案改为
-  「点开关或 Ctrl+Alt+B 恢复不透明」。
-- 机制见 [docs/live-transparency.md](docs/live-transparency.md)，验证见 [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md)。
-
-## v0.1.7 更新内容
-
-- **播放页透明背景** — 全屏播放页右下角新增与 SPW 播放页控制按钮同位置的金色圆形「调音台」按钮，
-  点开是「播放页透明背景」开关（布局对齐 SPW 播放页的同一设置项）。开启后窗口变为色键透明窗口、
-  Folia 侧 `background.transparent=true` 停止绘制背景，页面底色本就是透明的，因此歌词/特效真正
-  叠加在桌面或其它窗口之上，而不是变成纯黑。
-- **透明模式的交互兜底** — 色键窗口是鼠标穿透的，所以透明开启后页面内按钮不可点：左下角会出现一个
-  不抢焦点的常驻浮标「恢复不透明背景 · Ctrl+Alt+B」，点它或按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y /
-  Ctrl+Alt+P / Ctrl+Alt+Shift+B）一键恢复不透明，同时通过页面钩子把开关同步回「关」、随设置持久化
-  （修掉了「退出透明后再次开启无效」的状态不同步问题）；ESC 仍可退出播放。
-- **颜色保真** — 色键合成会丢弃 `backdrop-filter` 图层（否则 chrome 在屏幕上整块消失），透明开启时
-  chrome 常驻并自动切换到无模糊的 flat 样式；恢复不透明后毛玻璃效果回来。
-- **零插件改动** — 新字段 `transparentPlayerBackground` 走现有设置树（插件整树持久化），宿主从
-  settings JSON 读取并切换窗口透明度，透明状态在重启后保留。
-- 机制与限制见 [docs/live-transparency.md](docs/live-transparency.md)，验证见
-  [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md)。
-
-![播放页透明背景：窗口真透明，歌词与特效叠加在桌面之上，右下角为「播放页透明背景」开关](docs/images/transparent-background.jpg)
-
-## v0.1.6 更新内容
-
-- **设置页大预览改为真实 Folia 渲染器** — 「歌词样式」左侧大预览不再是一张静态样式帧，而是同源
-  `preview.html` iframe 里跑 Folia 自己的 OBS 页面与渲染管线，样式、纹理分辨率、镜头运动、文字
-  动势、字体、背景与主题改动即时生效；暂停/播放按钮真正冻结并恢复画面。v0.1.5 的静态帧 Ken Burns
-  方案只保留为 iframe 不可用时的 fallback。
-- **暂停即完全静止** — 子帧在 `document_start` 用 rAF gate 包装 `requestAnimationFrame`，暂停时
-  渲染器/粒子/噪点循环全部停摆，恢复时冲刷队列；设置页关闭（overlay 隐藏）时子帧自动冻结，避免
-  隐藏的 1080p 渲染器空转。
-- **轻量接入** — 渲染器只在子帧里运行，settings bundle 仅 +12 KB（约 1.06 MB），发布包相对
-  v0.1.4 +0.7 MB；4 s 内未就绪自动回退静态帧，连续 5 轮开合复用同一个 iframe、无泄漏。
-- **宿主修复** — WebView2 就绪前收到的 `hello`/`settings` 不再触发 `post-page` 空引用；页面重载
-  后会回放缓存的歌词/曲目。
-- 验证见 [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md)（probe
-  11/11 PASS，暂停时可见区帧差 ratio 0.00000 / mean 0），与主发布器的接口契约见
-  [docs/live-preview-iframe.md](docs/live-preview-iframe.md)。
-
-![设置页大预览由 iframe 内的真实 Folia 渲染器实时绘制](docs/images/live-preview.jpg)
-
-## v0.1.4 更新内容
-
-- **修复歌词样式预览不随所选样式变化** — 设置页左侧大预览的交叉淡入由 `[src, current]` 依赖的
-  effect 驱动，`setCurrent()` 触发重新执行时会取消自己的淡入定时器，导致第一次切换之后新图一直停
-  在 opacity 0（旧图不透明）。重写为只依赖目标图的 effect + CSS `spw-preview-in` 淡入（220ms），
-  点击任意样式格后大预览/参数面板/高亮立即同步切换，连续切换也不再卡住。
-- 验证见 [docs/verification-v0.1.4.md](docs/verification-v0.1.4.md)。
-
-## v0.1.3 更新内容
-
-- **模组管理作者名改为 GitHub 账号** — 插件清单 `Plugin-Provider` 由 `dsh2 team` 改为 **`azkbzxf`**，
-  SPW「模组管理」的作者列随之更新。
-- **删除全部「有开关但无法生效」的设置** — 继 v0.1.2 移除「智能动感模式」后，v0.1.3 按
-  [docs/known-inert-settings.md](docs/known-inert-settings.md) 移除了：动感效果（推镜裂光/涟漪）、
-  自定义字体/系统字体、罗马音与和声字幕、自定义/URL 背景，以及凝彩图层图片、莫奈人像、群唱头像/
-  表情包等上传类控件（构建期从设置页剥离，不改 Folia 源码）。设置页现在只显示真正生效的控件。
-- **修复字体/字幕类设置无效** — 字体族（无衬线/衬线/等宽）与字重现在写入 `theme.fontStyle` /
-  `theme.fontWeight`；字幕字体跟随歌词或独立设置都会映射到 `subtitleTheme`；字幕内容模式归一化为
-  「翻译」。旧持久化值自动归一化。
-- 验证见 [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md)。
-
-![模组管理中的 spw-folia 0.1.3：作者 azkbzxf](docs/images/mod-manager.jpg)
-
-## v0.1.2 更新内容
-
-- **修复封面取色** — 插件发送的封面字段是 `coverDataUrl`，设置页却只读 `coverUrl`，导致主题始终
-  停留在默认深色。现在宿主同时发送两种拼写、页面侧回退到 `coverDataUrl`，全屏主题/背景/强调色
-  随当前封面变化（橙色封面 → 暖色主题；近黑封面 → 中性深色，见
-  [docs/images/cover-color.jpg](docs/images/cover-color.jpg) 与
-  [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md)）。
-- **移除「智能动感模式」开关** — 构建期从设置页剥离该卡片（不影响其它卡片），因为节拍模型不在
-  web bundle 中、开关不会有任何效果。
-- **整理失效开关清单** — 见 [docs/known-inert-settings.md](docs/known-inert-settings.md)。
-
-## v0.1.1 更新内容
-
-- **更多菜单条目与宿主原生项风格一致** — 与 播放速度 / 桌面歌词 / 歌词翻译 / 释放音频引擎
-  相同的行布局：19 dp 星芒图标（使用宿主内容色）、14 sp 文字、相同间距与禁用透明度。
-- **修复光标自动隐藏** — 全屏模式中鼠标静止 2.5 秒后隐藏、移动即恢复，歌词样式面板打开期间强制
-  显示。（v0.1.0 会永久隐藏光标，导致右上角 ⚙ 无法点击。）
-- **设置面板稳定性** — 修复页面↔宿主 UI 状态回环，该问题会导致面板空白/闪烁；现在滚动正确、秒开。
-
-## 端到端验证
-
-发布产物已在 Windows 11 上的真实 Salt Player for Windows 1.19.0（MS 渠道）中验证：
-
-| 检查项 | 证据 |
+| 版本 | 概要 |
 | --- | --- |
-| 迷你播放器「更多」浮层出现 **Folia** 条目，点击后打开全屏渲染器 | [docs/plugin-integration.md](docs/plugin-integration.md) §1, `poc/hook/shots/task7-*` |
-| 全屏 3200x2000 @175% DPI，页面 1776x1110 dpr1，3 个 canvas，110-120 fps；16 分钟长稳测试稳定（66-67.5 MB 工作集） | [docs/acceptance-report.md](docs/acceptance-report.md) T8 |
-| 播放进度 + 逐字歌词随 SPW 播放推进（100 ms 插值时间轴）；暂停/继续与跳转跟随 | [docs/plugin-integration.md](docs/plugin-integration.md) §1, [docs/acceptance-report.md](docs/acceptance-report.md) T1-T3 |
-| 真实鼠标输入：悬停 ⚙ 打开「歌词样式」浮层，← 返回渲染器，ESC 关闭（exit 0） | [docs/acceptance-report.md](docs/acceptance-report.md) T-G1..G3 |
-| **更多** 菜单中的 Folia 条目与宿主字体/星芒图标一致（v0.1.1）；**封面取色**随歌曲封面派生主题（v0.1.2，橙/黑纯色封面平均 RGB 165/105/66 vs 71/71/72） | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.2.md](docs/verification-v0.1.2.md) |
-| 设置/样式在 SPW 重启后保留；禁用插件后恢复 4 项菜单；5 次开/关与杀掉 SPW 后无残留辅助进程 | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
-| v0.1.3：模组管理作者名 = `azkbzxf`；A/B 组失效控件全部移除；字体族/字重/字幕字体在 `pushConfig` 中生效 | [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
-| v0.1.4：设置页大预览随样式选择实时切换（本地 harness 6 连点 + 真实 SPW 鼠标点击验证） | [docs/verification-v0.1.4.md](docs/verification-v0.1.4.md) |
-| v0.1.6：设置页大预览 = iframe 内真实 Folia 渲染器（3 canvas、暂停帧差 0.00000、切样式即时生效、5 轮开合复用同一 iframe、0 页面错误） | [docs/verification-live-preview-ui.md](docs/verification-live-preview-ui.md) |
-| v0.1.7：播放页透明背景（色键窗口真透明、桌面透出、左下浮标/ Ctrl+Alt+B 恢复不透明并同步页面开关、退出后再次开启正常、设置树持久化、ESC 退出、透明时 chrome 可见） | [docs/verification-v0.1.7.md](docs/verification-v0.1.7.md) |
-| v0.1.8：切歌即换词（track/lyrics 相差 2 ms）、封面 0.2 s 缩图并 0.4 s 内到页面、无封面保留旧主题；透明窗口内鼠标可点（透明中点开关 → `mode=off` + catcher 隐藏） | [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md) |
-| v0.1.9：鼠标穿透开关（`passthrough=on rects=3` → 点桌面 `passthrough=click at=1600,560` → catcher 恢复）、穿透下圆钮/齿轮/设置页返回键可点、热键退出后 `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
-| v0.1.10：滚轮向下崩溃修复（旧二进制投递 `WM_MOUSEWHEEL wparam=0xFF880000` 必抛 `OverflowException` 并弹出「Microsoft .NET Framework」对话框；新二进制反射级 15/15、真机级 0 弹窗、0 error 日志） | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
-| v0.1.11：stdin 泵跨线程访问 WebView2 崩溃修复（旧二进制收到 `lyrics` 后 30 ms 内抛 `InvalidOperationException` 并 2 s 后自杀，`statesReceived` 停在 32；新二进制 0 error、`statesReceived=96`、`quit` 正常送达退出码 0） | [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md) |
-| v0.2.0：透明窗口样式兼容（14 种样式逐项判定 native/tuned/unsupported；tempera/lumiere/pendolo/still 透明时自动精简、关透明恢复；monet 与浅色 lumiere 自动关透明并在面板提示）＋ 桥重开后旧写线程清理 ＋ 宿主 stdout 非阻塞队列（6 s stdout 暂停洪泛后 0 error、exit 0、`dropped=0`） | [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md) |
-| v0.2.1：Folia 菜单项颜色跟随宿主主题（`MenuFlyoutItemCompat` 的 `contentColor` 默认值 = `ʰ.Ԩ(composer).Ԩ()` 字节级确认；注入项反射读同一主题面板，浅/深主题均与宿主条目一致） | [docs/verification-v0.2.1.md](docs/verification-v0.2.1.md) |
-| 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
-| 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
+| **v0.2.1** | 浅色主题下「更多」菜单 Folia 条目配色跟随宿主主题；商店（MSIX）渠道 CLR 启动失败修复 |
+| v0.2.0 | 透明窗口样式兼容分级（native / tuned / unsupported）；桥重开后旧 stdin 写线程泄漏修复；宿主 stdout 非阻塞有界队列加固；新增 [运行环境与排障](docs/runtime-requirements.md) |
+| v0.1.11 | 修复 stdin 泵跨线程访问 WebView2 导致的必闪退（并可连带 SPW 卡死）；插件写管道阻塞冻结 SPW 修复 |
+| v0.1.10 | 修复透明模式下滚轮向下导致辅助进程 `OverflowException` 崩溃；未处理异常写入日志 |
+| v0.1.9 | 面板新增「鼠标穿透（操作桌面）」；圆钮/齿轮/面板热区始终可点；移除左下角常驻浮标 |
+| v0.1.8 | 切歌即换词（歌词独立轮询）、封面/主题跟随提速、透明窗口内鼠标可点 |
+| v0.1.7 | 播放页透明背景（色键透明窗口 + Ctrl+Alt+B 恢复）；透明时 chrome 无模糊常驻 |
+| v0.1.6 | 设置页大预览改为 iframe 内真实 Folia 渲染器（暂停即完全静止） |
+| v0.1.4 | 修复歌词样式预览不随所选样式变化（交叉淡入 effect 自取消） |
+| v0.1.3 | 模组管理作者名改为 `azkbzxf`；移除全部无法生效的设置；修复字体/字幕类设置无效 |
+| v0.1.2 | 修复封面取色（`coverDataUrl` / `coverUrl` 不一致）；移除「智能动感模式」开关 |
+| v0.1.1 | 「更多」菜单条目与宿主原生项风格一致；光标自动隐藏与设置面板回环修复 |
+| v0.1.0 | 首个版本：菜单 hook、全屏 Folia 渲染器、14 种样式、设置页、音频分析 |
+
+发布产物已在 Windows 11 的真实 SPW 1.19.0 上完成端到端验收（菜单条目 → 全屏渲染、14 种样式
+15/15 扫描、0 页面错误、0 外部网络请求、16 分钟长稳、设置持久化、无残留辅助进程）。完整矩阵见
+[docs/archive/acceptance-report.md](docs/archive/acceptance-report.md)。
 
 <p align="center"><img src="docs/images/style-grid.png" width="82%" alt="设置窗口中的全部 14 种 Folia 歌词样式"></p>
 
 ## 安装
 
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
-Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。另需系统自带 **.NET Framework 4.8**
+Windows 10 需安装 “Microsoft Edge WebView2 Runtime”），以及系统自带 **.NET Framework 4.8**
 （Windows 10 1903 起内置）。完整依赖矩阵、退出码与闪退排查见
 [docs/runtime-requirements.md](docs/runtime-requirements.md)。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.2.1.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 下载 `spw-folia-0.2.1.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -269,8 +100,8 @@ Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。另需系统自�
 
 ## 从源码构建
 
-工具链：JDK 25、Gradle 9.8（含 wrapper）、Kotlin 2.4.20、Node 24 + pnpm（设置 UI）、
-Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。无需 .NET SDK，无需 Android SDK。
+工具链：JDK 25、Gradle 9.8（含 wrapper）、Kotlin 2.4.20、Node 24 + pnpm（设置 UI）、Windows 自带
+`csc.exe`（.NET Framework 4.8，用于原生辅助进程）。无需 .NET SDK，无需 Android SDK。
 
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
@@ -290,10 +121,11 @@ bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + 
 python packaging/tools/assemble-release.py ^
     --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod ^
     --staging packaging --out dist/release --name spw-folia-0.2.1.spmod
-::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 
-项目结构：
+完整的打包流水线、payload 清单、大小预算与发布检查表见 [docs/release.md](docs/release.md)。
+
+## 项目结构
 
 ```
 spw-folia/       Kotlin 插件（hook、播放桥接、时间轴、配置、辅助进程管理）
@@ -302,8 +134,16 @@ poc/settings-ui/ Folia 设置窗口（复用 Folia 组件的 React island）
 poc/audio/       WASAPI 回环分析器（C#）+ 时间轴说明
 packaging/       暂存的 web bundle + 原生 payload + 许可证 + 发布文档
 docs/            架构、协议、宿主程序、hook 目标、Folia 规格、许可
+docs/archive/    历史发布说明、验证报告与验收证据（仅供追溯）
 research/        Folia 样式/设置调研笔记（AGPL；参考素材不提交到仓库）
 ```
+
+文档索引：[docs/architecture.md](docs/architecture.md)（架构）·
+[docs/protocol.md](docs/protocol.md)（通信协议）· [docs/host-app.md](docs/host-app.md)（原生宿主）·
+[docs/audio-timeline.md](docs/audio-timeline.md)（音频与时间轴）·
+[docs/settings-ui-impl.md](docs/settings-ui-impl.md)（设置 UI）·
+[docs/live-transparency.md](docs/live-transparency.md)（透明窗口机制）·
+[docs/folia-spec/](docs/folia-spec/)（Folia 复刻规格）· [docs/licensing.md](docs/licensing.md)（许可）。
 
 ## 架构（简版）
 
@@ -317,10 +157,6 @@ SPW (JVM)                                    spw-folia-host.exe (C#/WebView2)
 │  ConfigStore             │ ◀────────────── │  WASAPI 回环 → 音频帧             │
 └──────────────────────────┘ ready/closed/…  └───────────────────────────────────┘
 ```
-
-详见：[docs/architecture.md](docs/architecture.md) · 通信协议：
-[docs/protocol.md](docs/protocol.md) · 原生宿主：[docs/host-app.md](docs/host-app.md) ·
-Folia 规格：[docs/folia-spec/](docs/folia-spec/) · 许可：[docs/licensing.md](docs/licensing.md)。
 
 ## 致谢
 

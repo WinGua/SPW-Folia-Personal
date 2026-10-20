@@ -33,7 +33,7 @@ started」**。没有新特性，行为、协议与设置格式均与 v0.2.0 相
   另外新增一条告警：`<exe>.config` 不可达时写
   `helper .config not reachable at ...; CLR activation will likely fail with 0x80131700`，
   让这个「stdout/stderr 全空」的故障下次能一眼定位。
-- **新增运行时排查文档** — [runtime-requirements.md](runtime-requirements.md) §5 新增此案例
+- **新增运行时排查文档** — [runtime-requirements.md](../runtime-requirements.md) §5 新增此案例
   （退出码、关键字、CLR 启动日志证据、用户侧目录联接绕过方案）。
 
 ## 验证
@@ -91,7 +91,7 @@ sha256 `eeb8a128359531fa3f1d68d6ce6db5e808c3128f92c5f933e040ae7bae95ad34`）＋ 
 4. 重启 SPW，`更多 → Folia`。
 
 可直接从 v0.2.0 覆盖升级（协议、设置格式、web bundle 均未变）。系统依赖
-（WebView2 Runtime / .NET Framework 4.8）见 [runtime-requirements.md](runtime-requirements.md)。
+（WebView2 Runtime / .NET Framework 4.8）见 [runtime-requirements.md](../runtime-requirements.md)。
 
 ## 已知限制
 

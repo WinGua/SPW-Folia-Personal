@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | 歌词动画 | 纹理分辨率、镜头运动强度、文字动势、背景短线密度、外围边框等样式参数 | 通过 `visualizerTunings` 传给渲染器。 |
 | 歌词动画 | 各样式专属参数（商籁/凝彩/绘光/…/静止） | 同上；只保留可渲染的项。 |
-| 字体 | 字体族（无衬线/衬线/等宽）、字号、自动字重、整体透明度 | v0.1.3 起字体族/字重写入 `theme.fontStyle` / `theme.fontWeight`，渲染器实际读取（验证：`docs/verification-v0.1.3.md`）。 |
+| 字体 | 字体族（无衬线/衬线/等宽）、字号、自动字重、整体透明度 | v0.1.3 起字体族/字重写入 `theme.fontStyle` / `theme.fontWeight`，渲染器实际读取（验证：`docs/archive/verification-v0.1.3.md`）。 |
 | 字幕 | 隐藏翻译字幕、字幕内容模式（翻译）、字幕不透明度、字幕背景、即将歌词模糊、字幕字号 | 映射到 `subtitleOverlay*` / `showSubtitleTranslation` / `subtitleContentMode` / `subtitleFontScale`。 |
 | 字幕 | 字幕字体跟随歌词、字幕字体族、字幕字重 | v0.1.3 起映射到 `subtitleTheme`（跟随歌词时继承歌词主题字体）。 |
 | 背景 | 内置背景模式（隐现/光晕/莫奈/等）与背景参数 | 通过 `background` 配置传给渲染器。 |

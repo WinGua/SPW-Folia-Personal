@@ -125,7 +125,7 @@ Result: **CURSOR-FIX PASS** (5/5 assertions) and orphan test PASS on the final v
 ## Addendum — v0.1.2 regression (2026-10-19)
 
 Scope: cover-colour data path + removal of the 智能动感模式 card. Commands and raw evidence:
-`docs/verification-v0.1.2.md`.
+`docs/archive/verification-v0.1.2.md`.
 
 | check | result |
 | --- | --- |
@@ -138,7 +138,7 @@ Scope: cover-colour data path + removal of the 智能动感模式 card. Commands
 
 Scope: mod-manager author rename, removal of all remaining inert settings controls, group-C
 mapping fix (font family/weight, subtitle fonts). Commands and raw evidence:
-`docs/verification-v0.1.3.md`.
+`docs/archive/verification-v0.1.3.md`.
 
 | check | result |
 | --- | --- |
@@ -152,7 +152,7 @@ mapping fix (font family/weight, subtitle fonts). Commands and raw evidence:
 
 ## Addendum — v0.1.4 regression (2026-10-19)
 
-Scope: lyric-style preview now follows the selected style (m03519). Evidence: `docs/verification-v0.1.4.md`.
+Scope: lyric-style preview now follows the selected style (m03519). Evidence: `docs/archive/verification-v0.1.4.md`.
 
 | check | result |
 | --- | --- |

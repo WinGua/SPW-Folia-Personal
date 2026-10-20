@@ -45,7 +45,7 @@
 - 探针 `poc/webview/host/repro/click-post-probe.cs` 先证明合成消息链路可行；`WH_MOUSE_LL` 钩子在本机
   不触发，故没有采用钩子方案。
 
-机制见 [live-transparency.md](live-transparency.md)，明细见 [verification-v0.1.8.md](verification-v0.1.8.md)。
+机制见 [live-transparency.md](../live-transparency.md)，明细见 [verification-v0.1.8.md](verification-v0.1.8.md)。
 
 ## 产物
 

@@ -5,7 +5,7 @@
 1. 删除「智能动感模式」的开关；
 2. 修复封面取色功能。
 
-本文件记录根因、修复方式和可复现的证据。构建/打包命令见 [release.md](release.md)。
+本文件记录根因、修复方式和可复现的证据。构建/打包命令见 [release.md](../release.md)。
 
 ## 1. 封面取色（cover colour extraction）
 
@@ -37,9 +37,9 @@
 | `#E85D04`（橙） | (165.3, 104.9, 65.8) | **+99.5** |
 | `#09090B`（近黑） | (71.0, 71.0, 71.9) | **−0.9** |
 
-- 并排对比图：[images/cover-color.jpg](images/cover-color.jpg)
+- 并排对比图：[images/cover-color.jpg](../images/cover-color.jpg)
 - 全屏橙色主题截图（3200×2000 原始渲染）已随验证脚本输出。
-- 设置页整体背景也随封面变化（截图见 [images/settings-ui.jpg](images/settings-ui.jpg) 的暖色环境光）。
+- 设置页整体背景也随封面变化（截图见 [images/settings-ui.jpg](../images/settings-ui.jpg) 的暖色环境光）。
 
 ### 真实 SPW 中的证据
 
@@ -65,7 +65,7 @@ Folia 的 `VisPlaygroundSettingsPanel.tsx` 在 282 行渲染 `<SmartBeatSettings
 
 - 构建产物 `poc/settings-ui/dist/settings-ui.js` 中 `SmartBeatSettingsCard` 出现次数 = 0。
 - 宿主内实际渲染：页面文本 `智能动感模式` 不存在（`smart-beat:text-absent`），
-  「动感效果」等其它卡片与布局不受影响；见 [images/settings-ui.jpg](images/settings-ui.jpg)。
+  「动感效果」等其它卡片与布局不受影响；见 [images/settings-ui.jpg](../images/settings-ui.jpg)。
 - 本地回归：`node poc/hook/verify-cover.mjs` 的两次运行均返回 `settings-ui:ui smart-beat:text-absent`，0 页面错误。
 
 ## 3. 回归清单（v0.1.2）
@@ -81,4 +81,4 @@ Folia 的 `VisPlaygroundSettingsPanel.tsx` 在 282 行渲染 `<SmartBeatSettings
 ## 4. 仍然「有开关但不生效」的功能
 
 未改动、但当前版本没有数据来源因此不产生视觉变化的功能，
-统一列在 [known-inert-settings.md](known-inert-settings.md)。
+统一列在 [known-inert-settings.md](../known-inert-settings.md)。
