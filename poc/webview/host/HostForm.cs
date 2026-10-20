@@ -1165,17 +1165,43 @@ namespace SpwFolia
             PostToPage(sb.ToString());
         }
 
+        /// <summary>
+        /// Delivers one payload to the page. Caller-agnostic: safe from any thread.
+        ///
+        /// v0.1.11: WebView2's WinForms control may only be touched from the thread that created it,
+        /// and `CoreWebView2` access is a checked operation — reading the property off-thread throws
+        /// `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.` before
+        /// any try/catch below could see it. The stdin pump calls this through HandleStdinLine, so a
+        /// lyrics/track/command line used to kill the whole pump (the reader thread unwound into its
+        /// outer catch), which stopped all host->page traffic and ended the window ~2 s later.
+        /// The null check now lives inside the try, and anything coming from another thread is
+        /// marshalled onto the UI thread first.
+        /// </summary>
         private void PostToPage(string payload)
         {
-            if (!webviewReady || webView == null || webView.CoreWebView2 == null)
+            if (InvokeRequired)
             {
-                // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
-                // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
-                // track are cached by their callers and flushed on navigation completion.
-                log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
+                // Already marshalling with BeginInvoke keeps stdin ordering intact (queued FIFO).
+                SafeBeginInvoke(delegate { PostCore(payload); });
                 return;
             }
-            try { webView.CoreWebView2.PostWebMessageAsJson(payload); }
+            PostCore(payload);
+        }
+
+        private void PostCore(string payload)
+        {
+            try
+            {
+                if (!webviewReady || webView == null || webView.CoreWebView2 == null)
+                {
+                    // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
+                    // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
+                    // track are cached by their callers and flushed on navigation completion.
+                    log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
+                    return;
+                }
+                webView.CoreWebView2.PostWebMessageAsJson(payload);
+            }
             catch (Exception ex) { log.Error("post-page", ex); }
         }
 
@@ -1215,7 +1241,12 @@ namespace SpwFolia
                 while ((line = reader.ReadLine()) != null)
                 {
                     if (line.Length == 0) continue;
-                    HandleStdinLine(line);
+                    // v0.1.11: one unexpected line must never terminate the pump. The old loop let a
+                    // per-line exception unwind all the way out of the while, which (a) stopped every
+                    // later state/lyrics/track line from reaching the page and (b) scheduled a full
+                    // window exit two seconds later - the "Folia opens then vanishes" crash class.
+                    try { HandleStdinLine(line); }
+                    catch (Exception ex) { log.Error("stdin-line", ex); }
                 }
                 log.Log("info", "stdin-eof");
                 if (args.ExitOnStdinClose)

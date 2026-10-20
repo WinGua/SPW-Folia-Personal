@@ -63,6 +63,12 @@
   齿轮（以及它们打开的面板/设置页）永远可点。也可以按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P /
   Ctrl+Alt+Shift+B）或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
 
+## v0.1.11 更新内容
+
+- **修复：打开 Folia 后几秒内窗口必闪退，并可连带 SPW 卡死** — 辅助进程的 stdin 泵跑在后台线程上，但 `lyrics`/`track`/`command` 分支直接调用 `webView.CoreWebView2`（连读属性都在 UI 线程检查之内），必抛 `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.`，整个 stdin 读取线程就此终止，2 秒后窗口按「插件退出」流程自杀；负载高时被 Windows 判为挂起（Application Hang 1002）强制结束。现在 `PostToPage` 按 `InvokeRequired` 自动封送到 UI 线程，且 stdin 循环改为**逐行**捕获异常——单条坏行只丢该行，泵永不中断。
+- **修复：辅助进程停止读取时插件可冻结 SPW** — `FoliaHostBridge.sendLine` 原来在共享监视器内做阻塞式管道写，管道被填满后（155 KB 的 track 消息）写线程永久阻塞并握锁不放，而 `open()` 恰由 Compose UI 线程调用，SPW 主线程随之冻结。现在 stdin 由专职写线程 + 有界队列（满则丢最旧状态行）驱动，SPW 任何线程都不再可能阻塞在管道上。
+- 证据链（崩溃现场三条 `Application Hang (1002)`、两次 `InvalidOperationException`、退出码 `0xCFFFFFFF`）与修复前后同脚本复现对比见 [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md)。
+
 ## v0.1.10 更新内容
 
 - **修复：透明模式下滚轮向下导致辅助进程崩溃** — v0.1.9 的输入捕获窗口用 `IntPtr.ToInt32()`
@@ -199,6 +205,7 @@
 | v0.1.8：切歌即换词（track/lyrics 相差 2 ms）、封面 0.2 s 缩图并 0.4 s 内到页面、无封面保留旧主题；透明窗口内鼠标可点（透明中点开关 → `mode=off` + catcher 隐藏） | [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md) |
 | v0.1.9：鼠标穿透开关（`passthrough=on rects=3` → 点桌面 `passthrough=click at=1600,560` → catcher 恢复）、穿透下圆钮/齿轮/设置页返回键可点、热键退出后 `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
 | v0.1.10：滚轮向下崩溃修复（旧二进制投递 `WM_MOUSEWHEEL wparam=0xFF880000` 必抛 `OverflowException` 并弹出「Microsoft .NET Framework」对话框；新二进制反射级 15/15、真机级 0 弹窗、0 error 日志） | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
+| v0.1.11：stdin 泵跨线程访问 WebView2 崩溃修复（旧二进制收到 `lyrics` 后 30 ms 内抛 `InvalidOperationException` 并 2 s 后自杀，`statesReceived` 停在 32；新二进制 0 error、`statesReceived=96`、`quit` 正常送达退出码 0） | [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -209,7 +216,7 @@
 要求：Windows 10/11 x64、**Salt Player for Windows 1.19.0**、WebView2 Runtime（Windows 11 已内置；
 Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.10.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.11.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -240,7 +247,7 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
     --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.10.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.10.spmod
+    --staging packaging --out dist/release --name spw-folia-0.1.11.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

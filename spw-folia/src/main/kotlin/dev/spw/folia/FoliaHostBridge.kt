@@ -5,8 +5,10 @@ import java.io.File
 import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -27,9 +29,23 @@ internal class FoliaHostBridge(
 ) {
 
     @Volatile private var process: Process? = null
-    @Volatile private var writer: BufferedWriter? = null
     @Volatile private var ready = false
     @Volatile private var stopping = false
+
+    /**
+     * v0.1.11: the helper's stdin is now written exclusively by one daemon thread fed from a bounded
+     * queue. The old `sendLine` wrote *inside synchronized(this)*, so once the helper stopped reading
+     * (its stdin pump could die, see the v0.1.11 host fix) the JVM blocked forever inside
+     * `OutputStreamWriter.flush()` **while holding the very monitor** that `open()`/`stop()`/
+     * `cleanup()`/`mirrorStdout()` also need. `open()` is called straight from the Compose UI thread
+     * when the user clicks 更多 -> Folia, so a wedged helper froze all of SPW ("未响应" -> force close).
+     * With a dedicated writer nothing in SPW can ever block on the pipe again; back-pressure drops
+     * the oldest queued line instead (every line is perishable state, never a command that matters).
+     */
+    private val pendingLines = LinkedBlockingQueue<String>(WRITE_QUEUE_CAPACITY)
+    private val stdoutLogLock = Any()
+    @Volatile private var writerThread: Thread? = null
+    @Volatile private var stdinBroken = false
 
     @Volatile private var pid: Long = -1L
 
@@ -61,6 +77,7 @@ internal class FoliaHostBridge(
     private var lastLoggedPlaying: Boolean? = null
     private var stateLinesSent = 0L
     private var fpsLinesSeen = 0L
+    private val droppedLines = AtomicLong(0L)
     private var stdoutLog: BufferedWriter? = null
 
     fun isRunning(): Boolean {
@@ -134,7 +151,6 @@ internal class FoliaHostBridge(
         }
         process = p
         pid = p.pid()
-        writer = BufferedWriter(OutputStreamWriter(p.outputStream, StandardCharsets.UTF_8))
         ready = false
         stateLinesSent = 0
         fpsLinesSeen = 0
@@ -144,6 +160,7 @@ internal class FoliaHostBridge(
         lastSentLyrics.set(null)
         startStdoutReader(p)
         startExitWatcher(p)
+        startStdinWriter(p)
         sendLine(
             "{\"t\":\"hello\",\"protocol\":1,\"pluginVersion\":${Json.str(FoliaPlugin.PLUGIN_VERSION)}," +
                 "\"spwVersion\":${Json.str(FoliaPlugin.SPW_VERSION)},\"bundleDir\":${Json.str(web.absolutePath)}}"
@@ -160,12 +177,10 @@ internal class FoliaHostBridge(
         stopping = true
         stopPump()
         sendLine("{\"t\":\"quit\"}")
-        try {
-            writer?.flush()
-            writer?.close()
-        } catch (_: Throwable) {
-        }
-        writer = null
+        sendLine(WRITER_POISON)
+        // Give the writer a moment to flush quit + poison into the pipe; it is a no-op when the
+        // writer is already gone (stdinBroken), which `waitFor` below handles through the timeout.
+        writerThread?.join(500)
         try {
             if (!p.waitFor(2, TimeUnit.SECONDS)) {
                 log("helper did not exit in 2s, killing pid=$pid")
@@ -218,16 +233,49 @@ internal class FoliaHostBridge(
     }
 
     private fun sendLine(line: String) {
-        val out = writer ?: return
-        synchronized(this) {
-            try {
-                out.write(line)
-                out.write("\n")
-                out.flush()
-            } catch (t: Throwable) {
-                log("stdin write failed: ${t::class.java.name}: ${t.message}")
+        if (stdinBroken || writerThread == null) return
+        // Bounded by design: when the helper stops draining the pipe we must not pile up 155 KB
+        // track payloads unbounded. Drop the oldest buffered line - every message is idempotent
+        // state (100 ms `state` cadence, lyrics/track snapshots), so the freshest line wins.
+        while (!pendingLines.offer(line)) {
+            val dropped = pendingLines.poll()
+            if (dropped != null && dropped != WRITER_POISON) {
+                val count = droppedLines.incrementAndGet()
+                if (count <= 3L || count % 100L == 0L) {
+                    log("stdin queue overflow, dropping buffered line #$count")
+                }
             }
         }
+    }
+
+    /** The single owner of the helper's stdin. Any failure marks the pipe dead and drains it. */
+    private fun startStdinWriter(p: Process) {
+        pendingLines.clear()
+        stdinBroken = false
+        val out = BufferedWriter(OutputStreamWriter(p.outputStream, StandardCharsets.UTF_8))
+        val thread = Thread({
+            try {
+                while (true) {
+                    val line = pendingLines.take()
+                    if (line == WRITER_POISON) break
+                    out.write(line)
+                    out.write("\n")
+                    out.flush()
+                }
+            } catch (t: Throwable) {
+                if (!stopping) log("stdin writer stopped: ${t::class.java.name}: ${t.message}")
+            } finally {
+                stdinBroken = true
+                pendingLines.clear()
+                try {
+                    out.flush()
+                    out.close()
+                } catch (_: Throwable) {
+                }
+            }
+        }, "spw-folia-host-stdin").apply { isDaemon = true }
+        writerThread = thread
+        thread.start()
     }
 
     // --------------------------------------------------------------- threads ----
@@ -251,8 +299,11 @@ internal class FoliaHostBridge(
 
     /** Mirrors every helper stdout line into spw-folia-host.stdout.log (raw protocol evidence). */
     private fun mirrorStdout(line: String) {
-        val out = stdoutLog ?: return
-        synchronized(this) {
+        // v0.1.11: log-file writes moved off the shared monitor (`this`), so they can never be
+        // blocked behind - or block - a lifecycle call such as open()/stop() on the UI thread.
+        val out: BufferedWriter? = stdoutLog
+        if (out == null) return
+        synchronized(stdoutLogLock) {
             try {
                 out.write(line)
                 out.write("\n")
@@ -321,8 +372,13 @@ internal class FoliaHostBridge(
 
     private fun cleanup(reason: String) {
         stopPump()
-        writer = null
-        synchronized(this) {
+        // Mark the pipe dead first so the pump thread stops queueing into a dead writer.
+        stdinBroken = true
+        writerThread = null
+        pendingLines.clear()
+        val dropped = droppedLines.getAndSet(0L)
+        if (dropped > 0L) log("host cleanup ($reason): $dropped queued stdin lines were dropped")
+        synchronized(stdoutLogLock) {
             try {
                 stdoutLog?.flush()
                 stdoutLog?.close()
@@ -435,6 +491,15 @@ internal class FoliaHostBridge(
     companion object {
         /** 100 ms state cadence: docs/protocol.md asks for >=20 Hz; the timeline interpolates. */
         private const val STATE_PERIOD_MS = 100L
+
+        /**
+         * v0.1.11: bound for the stdin writer queue. Large enough to absorb a ~155 KB track payload
+         * and a couple of cover reloads, small enough that a wedged helper cannot balloon memory.
+         */
+        private const val WRITE_QUEUE_CAPACITY = 256
+
+        /** Poison pill: flushes whatever precedes it, then ends the stdin writer thread. */
+        private const val WRITER_POISON = "__spw-folia-writer-poison__"
 
         /** Track/lyrics are polled every 200 ms (they are cheap cached JSON diffs); the provider
          *  itself throttles the Workshop API round-trip, see FoliaPlaybackExtension. */
