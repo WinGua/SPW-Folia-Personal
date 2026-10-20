@@ -11,10 +11,11 @@ and [`docs/release.md`](../release.md) keeps a compact artifact ledger.
 
 ## Contents
 
-- `release-notes-v*.md` (12) — the release bodies for v0.1.0 … v0.2.1, including v0.1.5 / v0.1.8 /
-  v0.1.11, which were never published as GitHub Releases. Superseded by the Releases page.
+- `release-notes-v*.md` (12) — the release bodies for v0.1.0 … v0.2.1 (v0.1.5 and v0.1.11 never got
+  one; v0.1.8's notes describe a build that was never published). Superseded by the Releases page.
 - `verification-v*.md` (11) — per-version end-to-end verification reports (style sweeps, offline and
-  packaging assertions, crash repros). Read one when you need the evidence behind a specific fix.
+  packaging assertions, crash repros), including the unpublished v0.1.5 and v0.1.11 local builds. Read
+  one when you need the evidence behind a specific fix.
 - `verification-live-preview.md` — the task-14 report behind the live settings preview.
 - `verification-live-preview-ui.md` — the task-15 follow-up (real renderer inside the settings iframe);
   the current contract is [`docs/live-preview-iframe.md`](../live-preview-iframe.md).
