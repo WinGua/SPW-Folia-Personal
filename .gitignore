@@ -65,3 +65,6 @@ poc/hook/tmp-verify/
 /tmp-inspect/
 poc/webview/host/repro/*.exe
 poc/webview/host/repro/*.dll
+
+# promo-site capture scratch (raw recordings, ffmpeg binary, screenshots)
+/.tmp-capture/

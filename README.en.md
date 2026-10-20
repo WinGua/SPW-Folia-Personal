@@ -8,6 +8,7 @@ SPW is playing.
 [![Release](https://img.shields.io/github/v/release/azkbzxf/spw-folia)](https://github.com/azkbzxf/spw-folia/releases)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-lightgrey)](#install)
+[![Site](https://img.shields.io/badge/promo%20site-azkbzxf.github.io%2Fspw--folia-ffb545)](https://azkbzxf.github.io/spw-folia/)
 
 [中文](README.md) | **English**
 
@@ -46,6 +47,11 @@ SPW is playing.
   <img src="docs/images/style-grid.png" width="49%" alt="All 14 lyric styles at a glance">
 </p>
 <div align="center"><sub>Fullscreen page · Folia settings · Transparent playback page · 14 lyric styles</sub></div>
+
+> Want the whole tour at once? The [**promo site**](https://azkbzxf.github.io/spw-folia/) has the
+> scrolling demo, every style at full size, and a
+> [48-second recorded walkthrough](https://azkbzxf.github.io/spw-folia/#film) — all footage rendered
+> by the plugin itself.
 
 ## Install
 

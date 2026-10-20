@@ -7,6 +7,7 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
 [![Release](https://img.shields.io/github/v/release/azkbzxf/spw-folia)](https://github.com/azkbzxf/spw-folia/releases)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-lightgrey)](#安装)
+[![Site](https://img.shields.io/badge/%E5%AE%A3%E4%BC%A0%E7%AB%99-azkbzxf.github.io%2Fspw--folia-ffb545)](https://azkbzxf.github.io/spw-folia/)
 
 **中文** | [English](README.en.md)
 
@@ -40,6 +41,9 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
   <img src="docs/images/style-grid.png" width="49%" alt="14 种歌词样式一览">
 </p>
 <div align="center"><sub>全屏播放页 · Folia 设置页 · 播放页透明背景 · 14 种歌词样式</sub></div>
+
+> 想一次看全？[**宣传站**](https://azkbzxf.github.io/spw-folia/) 有滚动演示、14 种样式大图，
+> 以及 [一段 48 秒的实拍巡览](https://azkbzxf.github.io/spw-folia/#film)（画面全部由插件真实渲染）。
 
 ## 安装
 

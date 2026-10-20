@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>spw-folia — 让歌词成为风景</title>
+<meta name="description" content="Salt Player for Windows 的 Folia 歌词可视化插件：真实 Folia 渲染器、14 种样式、播放页透明叠加，实测 100–114 FPS。" />
+<meta property="og:title" content="spw-folia — 让歌词成为风景" />
+<meta property="og:description" content="把 Folia 真正的渲染器搬进 Windows 桌面。14 种样式，逐字发光，与播放器同步。" />
+<meta property="og:image" content="assets/video/hero-poster.jpg" />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2306060a'/%3E%3Cpath d='M16 6l2.6 7.4L26 16l-7.4 2.6L16 26l-2.6-7.4L6 16l7.4-2.6z' fill='%23ffb545'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a class="brand" href="#top">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M16 4l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" />
+    </svg>
+    <span>spw-folia</span>
+  </a>
+  <div class="nav-links">
+    <a href="#styles">样式</a>
+    <a href="#smooth">流畅</a>
+    <a href="#overlay">透明</a>
+    <a href="#film">宣传片</a>
+    <a href="#install">安装</a>
+    <a class="nav-cta" href="https://github.com/azkbzxf/spw-folia" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <video class="hero-video" autoplay muted loop playsinline poster="assets/video/hero-poster.jpg">
+    <source src="assets/video/hero.mp4" type="video/mp4" />
+  </video>
+  <div class="hero-veil"></div>
+  <div class="hero-grain"></div>
+
+  <div class="hero-copy">
+    <p class="eyebrow">Salt Player for Windows · 歌词可视化</p>
+    <h1>让歌词<br /><em>成为风景</em></h1>
+    <p class="lede">
+      不是仿制的动效，而是把 Folia 真正的渲染器搬进 Windows 桌面。
+      逐字发光，随乐起伏，与播放器同步。
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-gold" href="https://github.com/azkbzxf/spw-folia/releases/latest" target="_blank" rel="noopener">
+        下载 v0.2.1 <span class="btn-sub">.spmod</span>
+      </a>
+      <a class="btn btn-ghost" href="#styles">看看 14 种样式</a>
+    </div>
+  </div>
+
+  <div class="hero-meta">
+    <span>AGPL-3.0</span>
+    <span class="dot"></span>
+    <span>Windows 10 / 11 x64</span>
+    <span class="dot"></span>
+    <span>不联网</span>
+  </div>
+
+  <a class="scroll-hint" href="#real" aria-label="向下滚动">
+    <span></span>
+  </a>
+</header>
+
+<main>
+
+  <!-- ─────────────────────────  真实渲染  ───────────────────────── -->
+  <section class="section real" id="real">
+    <div class="wrap">
+      <header class="sec-head reveal">
+        <p class="kicker">01 — 真身</p>
+        <h2>你看到的是<em>真正的 Folia</em></h2>
+        <p class="sub">
+          没有重画一帧动画。插件把上游 Folia 的渲染器原样打包，交给原生 WebView2 宿主实时绘制；
+          宿主只负责窗口、透明合成与音频采样。所以这里的每一个画面，就是 Folia 本身。
+        </p>
+      </header>
+    </div>
+
+    <figure class="frame reveal">
+      <video class="frame-video" autoplay muted loop playsinline preload="none" poster="assets/video/reel-poster.jpg">
+        <source src="assets/video/reel.mp4" type="video/mp4" />
+      </video>
+      <figcaption>
+        <span class="cap-dot"></span>
+        14 种样式连续切换 · 全部由 Folia 渲染器实时绘制
+      </figcaption>
+    </figure>
+
+    <div class="wrap">
+      <div class="facts">
+        <div class="fact reveal">
+          <h3>逐字发光</h3>
+          <p>每个字都有自己的入场时序与辉光，跟着音节的起落亮起来，而不是整行淡入。</p>
+        </div>
+        <div class="fact reveal">
+          <h3>封面取色</h3>
+          <p>从专辑封面提取主色调，歌词配色随之流动；换一首歌，就是换一片天色。</p>
+        </div>
+        <div class="fact reveal">
+          <h3>同步到播放器</h3>
+          <p>读取真实播放时间轴，拖动进度、暂停、切歌都立刻跟上，不是猜节拍。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  样式  ───────────────────────── -->
+  <section class="section styles" id="styles">
+    <div class="wrap">
+      <header class="sec-head reveal">
+        <p class="kicker">02 — 十四种气质</p>
+        <h2>同一句歌词，<em>十四种呼吸</em></h2>
+        <p class="sub">从安静的排版，到流动的光。每一款都是 Folia 的官方样式，一键切换。</p>
+      </header>
+    </div>
+
+    <div class="gallery" id="gallery"><!-- injected --></div>
+
+    <div class="wrap">
+      <p class="gallery-note reveal">
+        截图取自真实渲染器，金色主题为展示效果；插件内默认跟随封面与深浅色。
+      </p>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  流畅  ───────────────────────── -->
+  <section class="section smooth" id="smooth">
+    <div class="wrap">
+      <header class="sec-head reveal">
+        <p class="kicker">03 — 流畅</p>
+        <h2>看不见的<em>顺滑</em></h2>
+        <p class="sub">
+          原生 WebView2 + 硬件合成，14 款样式逐一实测，帧率稳定在 100 FPS 以上；
+          即使播放页完全透明、同时叠加在桌面之上，也没有掉帧。
+        </p>
+      </header>
+
+      <div class="stats">
+        <div class="stat reveal">
+          <p class="stat-num"><span class="count" data-to="114">0</span><span class="unit">FPS</span></p>
+          <p class="stat-label">实测峰值</p>
+        </div>
+        <div class="stat reveal">
+          <p class="stat-num"><span class="count" data-to="100">0</span><span class="unit">+</span></p>
+          <p class="stat-label">14/14 样式下限</p>
+        </div>
+        <div class="stat reveal">
+          <p class="stat-num"><span class="count" data-to="0">0</span><span class="unit">次</span></p>
+          <p class="stat-label">外部网络请求</p>
+        </div>
+        <div class="stat reveal">
+          <p class="stat-num"><span class="count" data-to="16">0</span><span class="unit">s</span></p>
+          <p class="stat-label">逐字时间轴循环</p>
+        </div>
+      </div>
+
+      <div class="flow reveal">
+        <div class="flow-line"><i></i></div>
+        <p class="flow-caption">逐帧绘制 · 无跳帧 · 无闪烁</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  透明  ───────────────────────── -->
+  <section class="section overlay" id="overlay">
+    <div class="wrap split">
+      <div class="split-copy reveal">
+        <p class="kicker">04 — 桌面之上</p>
+        <h2>让桌面<em>只剩歌词</em></h2>
+        <p class="sub">
+          播放页背景可以完全透明，歌词直接浮在你的壁纸上，不挡视线，也不影响操作。
+          鼠标穿透一键切换，两个浮标始终可点。
+        </p>
+        <ul class="ticks">
+          <li>真透明窗口，不是录制或黑底叠加</li>
+          <li>鼠标穿透开关：透明时也能正常操作桌面</li>
+          <li>左下角恢复浮标，随时找回播放页</li>
+        </ul>
+      </div>
+
+      <div class="desktop reveal" aria-label="桌面透明叠加示意">
+        <div class="desk-wall"></div>
+        <div class="desk-icons">
+          <span></span><span></span><span></span>
+        </div>
+        <video class="desk-video" autoplay muted loop playsinline preload="none" poster="assets/video/overlay-poster.jpg">
+          <source src="assets/video/overlay.mp4" type="video/mp4" />
+        </video>
+        <div class="desk-bar">
+          <span class="desk-toggle"><i></i></span>
+          <span class="desk-bar-label">播放页透明背景</span>
+          <span class="desk-float"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  设置  ───────────────────────── -->
+  <section class="section settings" id="settings">
+    <div class="wrap split split-rev">
+      <figure class="shot reveal">
+        <img src="assets/stills/settings-ui.jpg" alt="spw-folia 设置页：左侧为实时大预览，右侧为样式与参数面板" loading="lazy" />
+      </figure>
+      <div class="split-copy reveal">
+        <p class="kicker">05 — 一样的手感</p>
+        <h2>和 Folia<em>一样的设置页</em></h2>
+        <p class="sub">
+          设置页不是另做的简化版，而是沿用 Folia 的界面与参数体系：左侧实时大预览，
+          右侧调纹理、镜头、逐字动势与色彩模式，改一个值，画面立刻变。
+        </p>
+        <ul class="ticks">
+          <li>14 种样式、纹理分辨率、镜头运动强度全部开放</li>
+          <li>实时大预览由真实渲染器绘制，所见即所得</li>
+          <li>与 Folia 一致的标签页与滑块，不需要重新学</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  安装  ───────────────────────── -->
+  <section class="section install" id="install">
+    <div class="wrap">
+      <header class="sec-head reveal">
+        <p class="kicker">06 — 开始使用</p>
+        <h2>四步，<em>装进播放器</em></h2>
+        <p class="sub">
+          需要 Salt Player for Windows 1.19.0 与 Windows 10 / 11 x64。
+        </p>
+      </header>
+
+      <div class="install-grid">
+        <ol class="steps">
+          <li class="reveal">
+            <span class="step-n">1</span>
+            <div>
+              <h3>下载插件包</h3>
+              <p>从 GitHub Releases 取 <code>spw-folia-0.2.1.spmod</code>。</p>
+            </div>
+          </li>
+          <li class="reveal">
+            <span class="step-n">2</span>
+            <div>
+              <h3>放进插件目录</h3>
+              <p><code>%APPDATA%\Salt Player for Windows\workshop\plugins</code>，然后重启播放器。</p>
+            </div>
+          </li>
+          <li class="reveal">
+            <span class="step-n">3</span>
+            <div>
+              <h3>授予 class-transform 权限</h3>
+              <p>插件需要读取播放器类才能注入菜单项，首次启用时会提示。</p>
+            </div>
+          </li>
+          <li class="reveal">
+            <span class="step-n">4</span>
+            <div>
+              <h3>在「更多」里打开 Folia</h3>
+              <p>播放页右下角 → 更多 → Folia，即刻进入歌词可视化。</p>
+            </div>
+          </li>
+        </ol>
+
+        <figure class="menu-shot reveal">
+          <img src="assets/stills/menu-folia.png" alt="Salt Player 的「更多」菜单中出现 Folia 菜单项" loading="lazy" />
+          <figcaption>菜单里的四角星，就是它</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────────────────  宣传片  ───────────────────────── -->
+  <section class="section film" id="film">
+    <div class="wrap">
+      <header class="sec-head reveal">
+        <p class="kicker">07 — 一分钟巡览</p>
+        <h2>如果只想<em>看一遍</em></h2>
+        <p class="sub">
+          从真身、样式，到透明桌面与安装，一段不加速的实拍。画面全部来自插件真实渲染，
+          由无头浏览器逐帧录制，没有任何后期特效。
+        </p>
+      </header>
+    </div>
+
+    <figure class="film-frame reveal">
+      <video class="film-video" controls muted playsinline preload="none" poster="assets/video/tour-poster.jpg">
+        <source src="assets/video/tour.mp4" type="video/mp4" />
+        你的浏览器不支持 video 标签。
+      </video>
+      <figcaption>
+        <span class="cap-dot"></span>
+        48 秒 · 1920×1080 · 无加速实拍
+        <a class="film-dl" href="assets/video/tour.mp4" download>下载</a>
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="section cta-band">
+    <div class="wrap">
+      <p class="reveal">把夜晚交给一行歌词。</p>
+      <div class="hero-actions reveal">
+        <a class="btn btn-gold" href="https://github.com/azkbzxf/spw-folia/releases/latest" target="_blank" rel="noopener">下载最新版 <span class="btn-sub">.spmod</span></a>
+        <a class="btn btn-ghost" href="https://github.com/azkbzxf/spw-folia" target="_blank" rel="noopener">查看源码</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4l3 9 9 3-9 3-3 9-3-9-9-3 9-3z" /></svg>
+      <div>
+        <p class="footer-name">spw-folia</p>
+        <p class="footer-desc">Salt Player for Windows 的 Folia 歌词可视化插件</p>
+      </div>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/azkbzxf/spw-folia" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/azkbzxf/spw-folia/releases" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/azkbzxf/spw-folia/blob/main/docs/architecture.md" target="_blank" rel="noopener">文档</a>
+      <a href="https://github.com/azkbzxf/spw-folia/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0</a>
+    </div>
+  </div>
+  <div class="wrap footer-fine">
+    <p>
+      渲染器来自 <a href="https://github.com/chthollyphile/Folia" target="_blank" rel="noopener">Folia</a>（chthollyphile）；
+      宿主为 Salt Player for Windows（Moriafly）插件。本页面截图与视频均由插件真实渲染并以无头浏览器录制。
+    </p>
+  </div>
+</footer>
+
+<script src="main.js" defer></script>
+</body>
+</html>
