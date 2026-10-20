@@ -41,6 +41,13 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   other window (ideal for OBS / livestream overlays). The second row, **鼠标穿透（操作桌面）(mouse
   passthrough)**, sends clicks to the desktop while the gold button and the top-right gear stay
   clickable in every state. Both switches persist in the settings tree.
+- **Transparent-window style compatibility** (v0.2.0) — the transparent window is colour-keyed, so any
+  semi-transparent decoration the page paints turns into a pink haze. v0.2.0 classifies all 14 styles:
+  11 are directly transparent-safe; tempera / lumiere / pendolo / still get a render-only tuning
+  override while transparency is on (your stored settings are untouched, the original look returns as
+  soon as transparency is off); monet (and lumiere on light themes) paints a large semi-transparent
+  layer that no tuning can remove — selecting those styles turns transparency (and mouse passthrough)
+  off automatically with an explanation in the panel, instead of showing a magenta screen.
 - **Cover-colour theming** — theme, background tint and accent are derived from the current track's
   album art (fixed in v0.1.2) and follow cover changes live.
 - **Synced to SPW playback** — track, lyrics timeline (word-level cells), subtitle translation,
@@ -72,6 +79,63 @@ Bring [Folia](https://github.com/chthollyphile/folia-major)'s lyric visualizatio
   You can also press **Ctrl+Alt+B** (fallbacks Ctrl+Alt+Y / Ctrl+Alt+P / Ctrl+Alt+Shift+B) or ESC to
   exit playback. Details: [docs/live-transparency.md](docs/live-transparency.md).
 - No music library writing; the plugin only reads playback state + the current track/lyrics/cover.
+
+## What's new in v0.2.0
+
+- **New: transparent-window style compatibility** — the transparent player window is colour-keyed:
+  pixels the page paints with alpha < 1 get mixed with the key colour (pure magenta) and show up as a
+  pink haze in the real window. v0.2.0 classifies the 14 styles into three levels. **native** (11
+  styles) leaves only glyphs / line art once Folia's background renderer is switched off, so it works
+  transparent as-is. **tuned** (tempera, lumiere, pendolo, still) paints large semi-transparent
+  decorations; while transparency is on the publisher adds a render-only tuning override (or a scoped
+  CSS rule for `still`) that is never written to your settings, so the original look comes back the
+  moment transparency is off. **unsupported** (monet, and lumiere on light themes) cannot shed its
+  large semi-transparent layer — selecting the style turns transparency and mouse passthrough off and
+  the panel explains why, instead of painting the window solid magenta. Compatibility table:
+  `poc/settings-ui/src/model/transparencyCompat.ts`; probes and regression:
+  [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md).
+- **Fixed: stale stdin writer after closing and reopening Folia** — the bridge instance is reused after
+  a window close (`onClosed` only logs; `stop()` runs on plugin disable/delete), so the old writer
+  thread kept waiting in `take()` on a queue that was shared with the instance, and a reopened session
+  could have its lines stolen by the old thread. The queue and writer are now **per session**: `open()`
+  retires any previous writer explicitly (`interrupt` + `join`) and `cleanup()` goes through
+  `stopStdinWriter()`, so an old thread can never pollute a new session. `cleanup()` also carries a
+  **session-identity check** (it only tears down the helper process it owns) and shares the lifecycle
+  lock with `open()`/`stop()`, so a late exit cleanup from a previous session cannot disturb a window
+  that was just reopened.
+- **Hardened: non-blocking host stdout queue** — the helper used to write protocol/log lines to stdout
+  synchronously and flush on the calling thread; if the plugin stopped draining stdout, the helper's UI
+  thread froze inside `log.Log()` (one v0.1.10 field log showed ~17 s without host lines, then exit
+  `0xCFFFFFFF`). Output now goes through a dedicated `spw-folia-stdout` thread with an 8192-line bounded
+  queue, and the `host-exit` line additionally records the dropped-line count (`dropped=`).
+- **Runtime docs** — new [docs/runtime-requirements.md](docs/runtime-requirements.md): dependency
+  matrix (WebView2 Runtime / .NET Framework 4.8 / SPW 1.19.0), exit-code meanings and a crash
+  troubleshooting checklist. The install requirements now mention the system **.NET Framework 4.8**
+  (built into Windows 10 1903+).
+- Both crash fixes from v0.1.11 are included in this release (next section).
+
+## What's new in v0.1.11
+
+- **Fixed: the helper exited a few seconds after Folia opened, sometimes freezing SPW too** — the
+  helper's stdin pump runs on a background thread, but its `lyrics`/`track`/`command` branches touched
+  `webView.CoreWebView2` directly (even reading the property is thread-checked), so the shared helper
+  threw `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.` That
+  exception escaped the stdin reader, killed it, and two seconds later the window closed through the
+  "plugin exited" path; under load Windows recorded it as Application Hang (1002). `PostToPage` now
+  marshals to the UI thread via `InvokeRequired`/`PostCore`, and the stdin loop catches exceptions
+  **per line** — one bad protocol message only drops that line (pipe/read-level errors still follow
+  the exit path).
+- **Fixed: the plugin could freeze SPW while the helper stopped reading** — `FoliaHostBridge.sendLine`
+  used to write to the pipe (a blocking flush) while holding the shared monitor; once the pipe filled up
+  (a track message measured at 155 KB, up to ~213 KB) the writer blocked forever holding that lock,
+  while `open()` is called from the Compose UI thread, freezing SPW's main thread. stdin is now driven
+  by a dedicated writer thread with a bounded queue (drop-oldest state lines; under normal load only
+  `state` is dropped, extreme overflow may also drop `settings`, which a reopened window re-sends), so
+  SPW's UI/lifecycle threads can no longer block on the pipe — only the daemon writer absorbs
+  back-pressure (`open/stop` join at most 500 ms).
+- Evidence (three `Application Hang (1002)` entries, two `InvalidOperationException`s, exit
+  `0xCFFFFFFF`) and the before/after repro:
+  [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md).
 
 ## What's new in v0.1.10
 
@@ -234,6 +298,8 @@ The shipped payload was validated in real Salt Player for Windows 1.19.0 (MS cha
 | v0.1.8: lyrics switch with the track (`track`/`lyrics` 2 ms apart), cover shrunk in 0.2 s and on the page in 0.4 s, previous theme kept while a cover is missing; in-page mouse works while transparent (clicking the switch while transparent → `mode=off` + catcher hidden) | [docs/verification-v0.1.8.md](docs/verification-v0.1.8.md) |
 | v0.1.9: mouse passthrough (`passthrough=on rects=3` → desktop click `passthrough=click at=1600,560` → catcher restored), gold button/gear/settings-page back button clickable while passthrough is on, hotkey exit leaves `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
 | v0.1.10: wheel-down crash fixed (old helper throws `OverflowException` and shows the "Microsoft .NET Framework" dialog on `WM_MOUSEWHEEL wparam=0xFF880000`; new helper passes 15/15 reflection checks and 0 dialogs / 0 error lines live) | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
+| v0.1.11: cross-thread WebView2 access in the stdin pump fixed (old helper threw `InvalidOperationException` 30 ms after `lyrics` and closed itself 2 s later with `statesReceived` stuck at 32; new helper 0 errors, `statesReceived=96`, clean `quit` and exit 0) | [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md) |
+| v0.2.0: transparent-window style compatibility (14 styles classified native/tuned/unsupported; tempera/lumiere/pendolo/still tuned only while transparent and restored afterwards; monet and daylight lumiere turn transparency off with a panel note) + stale writer cleanup after bridge reopen + non-blocking host stdout queue (0 errors, exit 0, `dropped=0` after a 6 s stdout stall flood) | [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md) |
 | **Folia** item matches host menu typography/sparkle icon (v0.1.1); **cover-colour theming** follows the album art (v0.1.2: orange vs black cover mean RGB 165/105/66 vs 71/71/72); **v0.1.3**: mod-manager author = `azkbzxf`, inert controls removed, font family/weight + subtitle fonts effective | [docs/images/menu-folia.png](docs/images/menu-folia.png), [docs/images/cover-color.jpg](docs/images/cover-color.jpg), [docs/verification-v0.1.3.md](docs/verification-v0.1.3.md) |
 | Settings/style persist across an SPW restart; disabling the plugin restores the 4-item menu; 5 open/close cycles and killing SPW leave no orphan helper | [docs/acceptance-report.md](docs/acceptance-report.md) T5-T7, T-E1 |
 | All 14 styles render from the release payload (15/15 sweep, 0 page errors, 0 external network); RC payload unpacked in a clean dir passes 19/19 layout/protocol checks | [docs/release-candidate.md](docs/release-candidate.md) |
@@ -248,7 +314,7 @@ Windows 11; Windows 10 can install "Microsoft Edge WebView2 Runtime"), plus **.N
 (included in Windows 10 1903 and later). Full dependency matrix, exit codes and crash triage:
 [docs/runtime-requirements.md](docs/runtime-requirements.md).
 
-1. Download `spw-folia-0.1.10.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
+1. Download `spw-folia-0.2.0.spmod` from the [Releases](https://github.com/azkbzxf/spw-folia/releases) page (Windows x64).
 2. In SPW: **设置 → 插件 / 创意工坊 → 导入插件**, pick the `.spmod`, then enable it and grant
    **class-transform** (`钩子`) permission when asked (the plugin needs it for the 更多-menu hook).
 3. Restart SPW if the plugin manager asks for it.
@@ -266,7 +332,7 @@ Windows in-box `csc.exe` (.NET Framework 4.8) for the native helper. No .NET SDK
 ```bat
 :: 1) plugin (Kotlin, official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.10.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.0.spmod
 
 :: 2) native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -279,8 +345,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) assemble the distributable .spmod (plugin classes + staged web bundle + native + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.10.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.10.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.0.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.0.spmod
 ::    see docs/release.md for the full, scripted assembly and local-install test loop.
 ```
 

@@ -134,7 +134,7 @@ export const buildBackgroundConfig = (settings: SettingsSnapshot) => {
 
 /** Every style's tuning, keyed by mode exactly as Folia's `VisualizerTuningBundle` expects.
  *
- *  v0.1.11: while the player window is transparent, styles that paint a large semi-transparent
+ *  v0.2.0: while the player window is transparent, styles that paint a large semi-transparent
  *  plate get a render-only override merged in (see `model/transparencyCompat.ts`). The override is
  *  applied here and not in the settings store, so it disappears as soon as transparency is off and
  *  the user's own tuning values are never touched. */

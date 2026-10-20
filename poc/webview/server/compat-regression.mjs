@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// v0.1.11 regression: load the real Folia OBS page + a Shim-shaped bridge stub + the built settings-UI
+// v0.2.0 regression: load the real Folia OBS page + a Shim-shaped bridge stub + the built settings-UI
 // bundle, then drive the settings round trip and assert what the page actually publishes.
 //
 // 1. compatibility table plumbing: `data-compat`, disabled switch, compat note, `data-spw-transparent`
@@ -317,7 +317,7 @@ v.stillOpaqueVignetteVisible = stillOpaqueDom.vignetteFound === true && stillOpa
 v.stillDatasetFlag = stillDom.dataset.spwTransparent === 'true';
 v.tunedNote = typeof results.panelTempera.noteText === 'string' && results.panelTempera.noteText.includes('简化');
 v.unsupportedNote = typeof results.panelMonet.noteText === 'string' && results.panelMonet.noteText.includes('无法');
-// v0.1.11 hotkey guard: Ctrl+Alt+B on an unsupported style must be refused *and* reported back so
+// v0.2.0 hotkey guard: Ctrl+Alt+B on an unsupported style must be refused *and* reported back so
 // the host drops the colour key; on a native style it must go through and round-trip.
 v.hotkeyRefusedOnMonet = results.hotkeyMonet.bridgeSettings.transparent === false
   && results.hotkeyMonet.dataset.spwTransparent === 'false'

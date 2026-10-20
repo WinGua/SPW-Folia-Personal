@@ -5,7 +5,7 @@
  * Folia's own `transparentPlayerBackground` setting: it hides the visualizer background and lets the
  * host window become colour-key transparent so the desktop actually shows through.
  *
- * v0.1.11: the selected lyric style decides whether the transparent window is usable at all. A style
+ * v0.2.0: the selected lyric style decides whether the transparent window is usable at all. A style
  * that paints a large semi-transparent plate under the colour key turns into a pink haze, so for
  * those styles the switch is disabled and the panel says why (the store closes transparency when
  * such a style is selected, see `model/transparencyCompat.ts`). */
@@ -28,9 +28,9 @@ interface PlayerBackgroundControlProps {
     onTogglePassthrough: (next: boolean) => void;
     passthroughLabel: string;
     passthroughHint: string;
-    /** v0.1.11: how the selected style behaves under the transparent window. */
+    /** v0.2.0: how the selected style behaves under the transparent window. */
     compat: TransparencyCompat;
-    /** v0.1.11: extra line under the switches (why the switch is off / what is simplified). */
+    /** v0.2.0: extra line under the switches (why the switch is off / what is simplified). */
     compatNote: string | null;
 }
 

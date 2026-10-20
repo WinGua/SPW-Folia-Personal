@@ -196,7 +196,7 @@ const scheduleSettingsEmit = (snapshot: SettingsSnapshot, force = false): void =
     }, wait);
 };
 
-/** v0.1.11: `applySnapshot` drops the transparent window when the snapshot's style cannot render it
+/** v0.2.0: `applySnapshot` drops the transparent window when the snapshot's style cannot render it
  *  (monet, or lumiere on a light cover). Remote snapshots are guarded by `applyingRemote`, so that
  *  correction would never be reported back and the host would keep the window keyed. Re-emit the
  *  corrected snapshot whenever the incoming one asked for transparency but the store ended up off. */
@@ -207,7 +207,7 @@ const emitBlockedTransparencyCorrection = (incoming: Partial<SettingsSnapshot> |
     scheduleSettingsEmit(snapshotFromState(state), true);
 };
 
-/** v0.1.11: push the current store snapshot to the host even when it did not change. Needed when the
+/** v0.2.0: push the current store snapshot to the host even when it did not change. Needed when the
  *  host switched the window into colour-key mode on its own (the Ctrl+Alt+B hotkey path) and the
  *  selected style refuses that mode — the page has to tell the host to drop the key again. */
 export const forceEmitSettings = (): void => {

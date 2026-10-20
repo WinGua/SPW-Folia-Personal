@@ -41,8 +41,15 @@ internal class FoliaHostBridge(
      * when the user clicks 更多 -> Folia, so a wedged helper froze all of SPW ("未响应" -> force close).
      * With a dedicated writer nothing in SPW can ever block on the pipe again; back-pressure drops
      * the oldest queued line instead (every line is perishable state, never a command that matters).
+     *
+     * v0.2.0: the queue belongs to one helper session (re-created by `startStdinWriter`). A window
+     * can be closed (ESC / 更多 -> Folia toggled) without the plugin being disabled, so the bridge
+     * is re-opened on the same instance: a writer of a previous session may still be parked in
+     * `take()`. It is interrupted before the new queue is published, and its `finally` may only
+     * touch the session it owns - otherwise a stale writer could wipe the *new* queue or mark the
+     * new pipe `stdinBroken` after writing the old, closed process, silently muting the second window.
      */
-    private val pendingLines = LinkedBlockingQueue<String>(WRITE_QUEUE_CAPACITY)
+    @Volatile private var pendingLines: LinkedBlockingQueue<String>? = null
     private val stdoutLogLock = Any()
     @Volatile private var writerThread: Thread? = null
     @Volatile private var stdinBroken = false
@@ -190,7 +197,7 @@ internal class FoliaHostBridge(
             log("helper stop error: ${t::class.java.name}: ${t.message}")
             p.destroyForcibly()
         }
-        cleanup("stopped")
+        cleanup("stopped", p)
     }
 
     // -------------------------------------------------------------- protocol ----
@@ -233,12 +240,18 @@ internal class FoliaHostBridge(
     }
 
     private fun sendLine(line: String) {
+        val queue = pendingLines ?: return
         if (stdinBroken || writerThread == null) return
-        // Bounded by design: when the helper stops draining the pipe we must not pile up 155 KB
-        // track payloads unbounded. Drop the oldest buffered line - every message is idempotent
-        // state (100 ms `state` cadence, lyrics/track snapshots), so the freshest line wins.
-        while (!pendingLines.offer(line)) {
-            val dropped = pendingLines.poll()
+        // Bounded by design: when the helper stops draining the pipe we must not pile up track
+        // payloads unbounded. Drop the oldest buffered line - under normal load the dropped lines
+        // are idempotent state (100 ms `state` cadence, lyrics/track snapshots), so the freshest
+        // line wins. Quit/poison are only enqueued after the pump stops and never become the oldest
+        // entry; in a degenerate sustained overflow `settings` may be the one dropped as well (a
+        // reopened window re-sends settings). Note the bound is a line count, not bytes: a track
+        // line can reach ~213 KB (cover <=160,000 B -> base64), so the theoretical worst case is
+        // tens of MB, but only after seconds of the helper not reading at all.
+        while (!queue.offer(line)) {
+            val dropped = queue.poll()
             if (dropped != null && dropped != WRITER_POISON) {
                 val count = droppedLines.incrementAndGet()
                 if (count <= 3L || count % 100L == 0L) {
@@ -248,25 +261,42 @@ internal class FoliaHostBridge(
         }
     }
 
-    /** The single owner of the helper's stdin. Any failure marks the pipe dead and drains it. */
+    /** The single owner of one helper session's stdin. Any failure marks that pipe dead. */
     private fun startStdinWriter(p: Process) {
-        pendingLines.clear()
-        stdinBroken = false
-        val out = BufferedWriter(OutputStreamWriter(p.outputStream, StandardCharsets.UTF_8))
+        // A previous session's writer may still be parked in take(); retire it before publishing
+        // the new queue so it can never consume (or poison) the new session's lines (v0.2.0).
+        stopStdinWriter()
+
+        val queue = LinkedBlockingQueue<String>(WRITE_QUEUE_CAPACITY)
+        // F5: if the helper dies right after spawn, constructing the pipe writer can throw. Fail the
+        // session gracefully (the exit watcher will still clean up) instead of propagating out of
+        // open() with a half-initialised bridge.
+        val out = try {
+            BufferedWriter(OutputStreamWriter(p.outputStream, StandardCharsets.UTF_8))
+        } catch (t: Throwable) {
+            log("stdin writer setup failed: ${t::class.java.name}: ${t.message}")
+            return
+        }
         val thread = Thread({
             try {
                 while (true) {
-                    val line = pendingLines.take()
+                    val line = queue.take()
                     if (line == WRITER_POISON) break
                     out.write(line)
                     out.write("\n")
                     out.flush()
                 }
             } catch (t: Throwable) {
-                if (!stopping) log("stdin writer stopped: ${t::class.java.name}: ${t.message}")
+                if (!stopping && writerThread === Thread.currentThread()) {
+                    log("stdin writer stopped: ${t::class.java.name}: ${t.message}")
+                }
             } finally {
-                stdinBroken = true
-                pendingLines.clear()
+                // Only the current session's writer may poison shared state (v0.2.0): a stale writer
+                // from a closed window must not clear the new queue or mark the new pipe broken.
+                if (writerThread === Thread.currentThread()) {
+                    stdinBroken = true
+                    queue.clear()
+                }
                 try {
                     out.flush()
                     out.close()
@@ -274,8 +304,29 @@ internal class FoliaHostBridge(
                 }
             }
         }, "spw-folia-host-stdin").apply { isDaemon = true }
+        pendingLines = queue
+        stdinBroken = false
         writerThread = thread
         thread.start()
+    }
+
+    /**
+     * Retires the current session's writer: invalidate it first (so its `finally` becomes a no-op),
+     * then unblock a thread parked in `take()`. Used by cleanup and before each new session.
+     */
+    private fun stopStdinWriter() {
+        val old = writerThread
+        writerThread = null
+        pendingLines = null
+        stdinBroken = true
+        old?.interrupt()
+        if (old != null && old !== Thread.currentThread()) {
+            try {
+                old.join(500)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
     }
 
     // --------------------------------------------------------------- threads ----
@@ -288,7 +339,7 @@ internal class FoliaHostBridge(
                     val line = reader.readLine() ?: break
                     if (line.isBlank()) continue
                     mirrorStdout(line)
-                    handleHostLine(line)
+                    handleHostLine(line, p)
                 }
                 log("host stdout EOF")
             } catch (t: Throwable) {
@@ -323,12 +374,12 @@ internal class FoliaHostBridge(
             }
             if (!stopping) {
                 log("host process exited code=$code")
-                cleanup("exited")
+                cleanup("exited", p)
             }
         }, "spw-folia-host-exit").apply { isDaemon = true }.start()
     }
 
-    private fun handleHostLine(line: String) {
+    private fun handleHostLine(line: String, source: Process) {
         when (val t = Json.stringField(line, "t")) {
             "ready" -> {
                 ready = true
@@ -339,8 +390,8 @@ internal class FoliaHostBridge(
             "closed" -> {
                 val reason = Json.stringField(line, "reason") ?: "?"
                 log("host closed reason=$reason")
-                cleanup(reason)
-                onClosed?.invoke(reason)
+                // Stale `closed` from a previous session must not close the new window (F1).
+                if (cleanup(reason, source)) onClosed?.invoke(reason)
             }
             "settings" -> {
                 val raw = Json.rawField(line, "settings")
@@ -370,14 +421,25 @@ internal class FoliaHostBridge(
         }
     }
 
-    private fun cleanup(reason: String) {
+    /**
+     * Tears down the current host session. `expected` is the process the caller owns: a cleanup that
+     * arrives late from a previous session's exit watcher / stdout reader must never tear down a
+     * newer session (F1), so it returns without touching state. Holding the lifecycle monitor makes
+     * cleanup atomic with respect to open()/stop() (F2); both already hold it, so nested calls are
+     * re-entrant. Returns true when this call actually cleaned the current session.
+     */
+    @Synchronized
+    private fun cleanup(reason: String, expected: Process? = null): Boolean {
+        if (expected != null && process !== expected) {
+            log("host cleanup ($reason) ignored: stale session")
+            return false
+        }
         stopPump()
-        // Mark the pipe dead first so the pump thread stops queueing into a dead writer.
-        stdinBroken = true
-        writerThread = null
-        pendingLines.clear()
+        // Retire the writer before the process reference disappears: this marks the pipe dead (so
+        // the pump stops queueing) and unblocks a writer parked in take() (v0.2.0).
+        stopStdinWriter()
         val dropped = droppedLines.getAndSet(0L)
-        if (dropped > 0L) log("host cleanup ($reason): $dropped queued stdin lines were dropped")
+        if (dropped > 0L) log("host cleanup ($reason): $dropped stdin lines were dropped by queue overflow during this session")
         synchronized(stdoutLogLock) {
             try {
                 stdoutLog?.flush()
@@ -390,6 +452,7 @@ internal class FoliaHostBridge(
         ready = false
         pid = -1L
         log("host cleanup ($reason)")
+        return true
     }
 
     // ------------------------------------------------------------- state pump ----

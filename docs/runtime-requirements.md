@@ -1,12 +1,13 @@
 # spw-folia 运行环境依赖清单与闪退排查
 
-Status: 依赖矩阵已按 **v0.1.10 发布产物** 逐项核对（代码 + 二进制 + 本机实测 + 微软官方文档）。
+Status: 依赖矩阵已按 **v0.2.0 发布产物** 逐项核对（代码 + 二进制 + 本机实测 + 微软官方文档）。
 适用对象：遇到「闪退 / 打不开 / 黑窗」的用户，以及维护者做支持回复。
 日期：2026-10-20 · 核对机：Windows 11 x64（build 26300）、WebView2 150.0.4078.83、.NET Framework 4.8.1。
 
 一句话结论：**插件自己不携带浏览器与 .NET，它把渲染交给系统里的 WebView2 Runtime、把窗口交给
 .NET Framework 4.8 编写的辅助进程。这两样系统组件任一缺失，都会表现为「用户点了没反应 / 窗口闪一下就消失」。**
-另外 v0.1.9 及更早版本有一个必定触发的滚轮崩溃（v0.1.10 已修），仍在旧版本上的用户会继续闪退。
+另外 v0.1.9 及更早版本有一个必定触发的滚轮崩溃（v0.1.10 已修），v0.1.10 在 WebView2 155+ 上还有一个
+歌词重放时的 stdin 泵跨线程崩溃（v0.1.11 起修复，v0.2.0 包含），仍在旧版本上的用户会继续闪退。
 
 ---
 
@@ -105,7 +106,8 @@ Get-ItemProperty 'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-429
 1. **装 WebView2 Runtime**：<https://developer.microsoft.com/microsoft-edge/webview2/consumer/>
    （Win11 自带，一般不用装；Win10/精简版系统/企业离线机是重灾区）。
 2. **装 .NET Framework 4.8**：<https://dotnet.microsoft.com/download/dotnet-framework/net48>（Win10 1903+ 已内置）。
-3. **升级到 v0.1.10**：v0.1.9 及更早在「透明背景 + 鼠标穿透」下滚轮向下**必定**崩溃（见 §5）。
+3. **升级到 v0.2.0**：v0.1.9 及更早在「透明背景 + 鼠标穿透」下滚轮向下**必定**崩溃；v0.1.10 在
+   WebView2 155+ 上打开 Folia 会因 stdin 泵跨线程访问在 2–3 秒内闪退（见 §5）。
 4. 仍然闪退：收集 §3 的三个日志 + `logs.txt`。
 
 ---
@@ -118,11 +120,17 @@ Get-ItemProperty 'HKCU:\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-429
    v0.1.10 改为 `unchecked((int)…ToInt64())` 并注册 `Application.ThreadException` /
    `AppDomain.UnhandledException` 输出协议错误行。**仍在 0.1.9 及更早的用户是最可能的「有些用户会闪退」来源。**
    详见 `docs/verification-v0.1.10.md`、`docs/release-notes-v0.1.10.md`。
-2. **WebView2 浏览器进程偶发退出（未修）** — `BrowserProcessExited reason=Unexpected`，
+2. **v0.1.10 在 WebView2 155+ 的 stdin 泵崩溃（已修）** — 打开 Folia 后歌词重放时，插件 stdin 线程
+   直接读 `webView.CoreWebView2` 抛 `InvalidOperationException: CoreWebView2 can only be accessed from
+   the UI thread.`，读取线程终止 → 2 秒后窗口自关；同一故障还会让插件管道写阻塞、拖死 SPW UI 线程
+   （「未响应」）。旧版 WebView2（如参考机 150.0.4078.83）对跨线程属性读取更宽容，所以只在 155+
+   用户机器上必现。v0.1.11 改为线程封送 + 专职写线程，v0.2.0 一并发布；详见
+   `docs/verification-v0.1.11.md`、`docs/release-notes-v0.2.0.md`。
+3. **WebView2 浏览器进程偶发退出（未修）** — `BrowserProcessExited reason=Unexpected`，
    症状为窗口用着用着消失、日志出现 `webview process-failed` + `closed reason=error` + exit 1。
    发布产物上出现过 1 次、开发期另 1 次，15 分钟压测未复现；当前没有自动重试（属后续任务），
    用户侧处理是重新打开一次。
-3. **环境缺失类**（不是代码 bug）：缺 WebView2 Runtime → exit 3；缺 .NET Framework 4.8 →
+4. **环境缺失类**（不是代码 bug）：缺 WebView2 Runtime → exit 3；缺 .NET Framework 4.8 →
    .NET 安装提示后退出；这两个占「打不开/闪退」报告的绝大多数。
 
 ---

@@ -192,7 +192,7 @@ interface SettingsState {
     mousePassthrough: boolean;
     setMousePassthrough: (value: boolean) => void;
 
-    /** v0.1.11: cover-derived theme lightness, mirrored from `useConfigPublisher` so the transparent
+    /** v0.2.0: cover-derived theme lightness, mirrored from `useConfigPublisher` so the transparent
      *  window guard can tell whether lumiere's light-theme dark field floor applies. Not persisted. */
     isDaylightTheme: boolean;
     setIsDaylightTheme: (value: boolean) => void;
@@ -219,7 +219,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     setActiveSection: activeSection => set({ activeSection }),
 
     visualizerMode: 'sonnet',
-    // v0.1.11: some styles paint a large semi-transparent plate (monet's portrait card, lumiere's
+    // v0.2.0: some styles paint a large semi-transparent plate (monet's portrait card, lumiere's
     // light-theme dark field) that the colour-key window would turn into a pink haze. Selecting one
     // of those turns the transparent window (and mouse pass-through) back off, so the style is
     // always usable — see `model/transparencyCompat.ts`.
@@ -269,7 +269,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         })),
 
     transparentPlayerBackground: false,
-    // v0.1.11: never let the colour key be switched on for a style that cannot render it. The panel
+    // v0.2.0: never let the colour key be switched on for a style that cannot render it. The panel
     // disables the switch already; this also covers the host hotkey (Ctrl+Alt+B) and the dev console.
     setTransparentPlayerBackground: transparentPlayerBackground =>
         set(state => {
@@ -283,7 +283,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         }),
 
     isDaylightTheme: false,
-    // v0.1.11: `lumiere` only becomes unsupported once the cover-derived theme turns out to be a
+    // v0.2.0: `lumiere` only becomes unsupported once the cover-derived theme turns out to be a
     // light one, which is known after the config publisher derives the palette. Re-check here so a
     // light cover cannot leave the window transparent with a 94%-opaque dark field behind it.
     setIsDaylightTheme: isDaylightTheme =>
@@ -376,7 +376,7 @@ export const applySnapshot = (snapshot: Partial<SettingsSnapshot> | null | undef
     const clean = <T>(value: T | undefined, fallback: T): T => (value === undefined || value === null ? fallback : value);
     useSettingsStore.setState(state => {
         const visualizerMode = clean(snapshot.styleId, state.visualizerMode);
-        // v0.1.11: a persisted snapshot may pair a style that cannot run transparent with the
+        // v0.2.0: a persisted snapshot may pair a style that cannot run transparent with the
         // transparent window on (e.g. the persisted store predates the guard, or the persisted
         // style was changed elsewhere). Never hydrate that combination.
         const transparentBlocked =

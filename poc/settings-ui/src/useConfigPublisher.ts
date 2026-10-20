@@ -125,7 +125,7 @@ export const useConfigPublisher = (): void => {
             if (disposed || token !== themeToken) return;
             coverTheme = result.theme;
             isDaylight = result.isDaylight;
-            // v0.1.11: the transparent-window compatibility of `lumiere` depends on the theme being
+            // v0.2.0: the transparent-window compatibility of `lumiere` depends on the theme being
             // light or dark, so the store mirrors the derived flag for the panel/switch logic.
             useSettingsStore.getState().setIsDaylightTheme(result.isDaylight);
             publisher.update({ ...themedInputs(), isDaylight });

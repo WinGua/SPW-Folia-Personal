@@ -2,7 +2,7 @@
 
 Status: **complete** (task-8). `packaging/` holds the exact payload of the final `.spmod`; the
 assembly script, checksums, size budget and a scripted packaged-layout acceptance test are included.
-Last verified: 2026-10-18 (host `spw-folia-host.exe` 108,032 B, WebView2 150.0.4078.83).
+Last verified: 2026-10-20 (v0.2.0 release artifact; host `spw-folia-host.exe` 130,560 B, WebView2 150.0.4078.83).
 
 ## 1. What ships
 
@@ -10,13 +10,13 @@ Last verified: 2026-10-18 (host `spw-folia-host.exe` 108,032 B, WebView2 150.0.4
 packaging/
   web/                         # -> .spmod/web/            (the page the host loads offline)
     index.html                 #    Folia OBS browser-source entry (PWA tags removed)
-    assets/… (1,872 files)     #    complete Folia web chunk graph incl. every lazy per-style chunk
+    assets/…                   #    complete Folia web chunk graph incl. every lazy per-style chunk
     settings/settings-ui.js    # -> injected settings island (task-5 build)
     settings/styles/           #    inlined CSS is in the JS; these are extra assets
     settings/thumbs/*.jpg      #    14 real Folia style thumbnails
     _host/shim.js, overlay.js  #    audit copies of the scripts embedded in the exe
   native/                      # -> .spmod/native/ (plugin resolveHelper also accepts lib/)
-    spw-folia-host.exe         #    C# .NET Framework 4.8 helper (~110 KB, 114,176 B here)
+    spw-folia-host.exe         #    C# .NET Framework 4.8 helper (130,560 B as of v0.2.0)
     spw-folia-host.exe.config  #    PerMonitorV2 DPI + supportedRuntime v4.8
     Microsoft.Web.WebView2.Core.dll
     Microsoft.Web.WebView2.WinForms.dll
@@ -41,10 +41,10 @@ Current sizes (`packaging/size-report.json`, `bash packaging/build-package.sh` o
 
 | area | files | size |
 | --- | --- | --- |
-| `web/` (complete Folia dist + settings island + 2 host-script copies) | 1,895 | 21.92 MB |
-| `native/` (exe 114,176 B + config + 3 dlls) | 5 | 1.00 MB |
+| `web/` (complete Folia dist + settings island + 2 host-script copies) | 1,898 | 22.35 MB |
+| `native/` (exe 130,560 B + config + 3 dlls) | 5 | 1.01 MB |
 | `licenses/` | 7 | 0.05 MB |
-| **total** | **1,907** | **22.96 MB** (budget 25 MB: OK) |
+| **total** | **1,910** | **23.41 MB** (budget 25 MB: OK) |
 
 The shipped web tree is the **complete** Folia production dist (every lazy chunk included), because
 Folia dynamic-imports per-style renderers on demand (`assets/VisualizerTempera-*.js`, …). An earlier
@@ -474,3 +474,35 @@ a `<level=error>` protocol line instead of only raising the Windows "unhandled e
 against v0.1.9 is exactly 4 entries: `classes/META-INF/MANIFEST.MF`, `FoliaHostBridge.class`,
 `FoliaPlugin.class`, `native/spw-folia-host.exe`. See `docs/verification-v0.1.10.md`,
 `docs/live-transparency.md`, `docs/release-notes-v0.1.10.md`.
+
+### v0.2.0 release artifact (final)
+
+```
+dist/release/spw-folia-0.2.0.spmod   13,149,053 B   1,941 entries
+sha256  d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb
+manifest: Plugin-Version 0.2.0 / Plugin-Provider azkbzxf / permissions class-transform,library-read
+payload plugin classes/            : gradle plugin-dev.spw.folia-0.2.0.spmod 90,812 B
+                                     (sha256 aeaec79ac2d8199a880979dfc1e7f2c28f19f78bc2be22c36868ad5a43290b48;
+                                      per-session stdin queue + cleanup(reason, expectedProcess) identity guard)
+        native/spw-folia-host.exe  : 130,560 B / sha256 2aa1f6c2284754a59718c5a399f8ee2103444e4f58fb94c539e3fff8ae763ea8
+                                     (PostToPage/PostCore UI-thread marshalling, per-line stdin catch,
+                                      closing idempotence, ScheduleExitOnUiThread, JsonStdout 8192-line
+                                      non-blocking pump)
+        web/                       : complete Folia 0.7.21 OBS bundle + settings island
+                                     (settings-ui.js 1,071,968 B / sha256 eeb8a128359531fa3f1d68d6ce6db5e808c3128f92c5f933e040ae7bae95ad34,
+                                      transparent style-compat layer: 11 native / 4 tuned / monet + light lumiere unsupported)
+        licenses/                  : AGPL-3.0 + NOTICE + SOURCE-OFFER + THIRD-PARTY + AUDIO-MIT
+assembly: bash packaging/build-package.sh, then
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.0.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.0.spmod
+```
+
+v0.2.0 ships the **transparent-window style-compatibility layer** (new feature) together with four
+crash/freeze fixes: v0.1.11's stdin-pump cross-thread crash (`PostToPage` touched `CoreWebView2` off the UI
+thread) and `sendLine` blocking-freeze of SPW (fixed by a dedicated writer thread + bounded queue), plus
+v0.2.0's per-session stdin-writer lifecycle fix (closing and reopening Folia left the old writer thread
+behind, which could poison the next session's queue) and the host's non-blocking stdout pump (v0.1.10 could
+block the UI thread on a full stdout pipe and hang SPW). Staged payload: 1,910 files / 23.41 MB
+(web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB); `packaging/tools/verify-layout.mjs` PASS
+on the packaged artifact. See `docs/verification-v0.2.0.md`, `docs/live-transparency.md` (§4.6),
+`docs/runtime-requirements.md`, `docs/release-notes-v0.2.0.md`.

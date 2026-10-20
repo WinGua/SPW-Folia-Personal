@@ -1,4 +1,4 @@
-/* v0.1.11: per-style compatibility with the transparent (colour-key) player window.
+/* v0.2.0: per-style compatibility with the transparent (colour-key) player window.
  *
  * The player window is made transparent with a colour key: every pixel the page draws with
  * alpha < 1 gets mixed with the key colour (pure magenta) and shows up as a pink haze in the
@@ -6,7 +6,7 @@
  * either fully opaque (glyphs, line art) or fully transparent — large semi-transparent plates
  * are not.
  *
- * Measured with the alpha probes (docs/verification-v0.1.11.md):
+ * Measured with the alpha probes (docs/verification-v0.2.0.md):
  *  - `native`: the style leaves nothing but glyphs / line art on screen once Folia's own
  *    background renderer is switched off by `background.transparent` (alpha coverage < 24%).
  *  - `tuned`: the style has a full-screen or otherwise large semi-transparent layer that can be

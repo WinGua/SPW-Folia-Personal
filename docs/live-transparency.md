@@ -128,6 +128,23 @@ webView.DefaultBackgroundColor = Color.Black;
 - **验证**：反射级 15/15；真机级旧二进制必现 `Microsoft .NET Framework` 弹窗、新二进制 0 弹窗；
   详见 `docs/verification-v0.1.10.md`。
 
+## 4.6 v0.2.0：透明窗口的样式兼容层
+
+色键透明的物理限制是：页面画出的每个 alpha < 1 的像素都会被混上键色（洋红）显示成粉雾。Folia 的
+14 种歌词/可视化样式里，有的在去掉背景层后只剩不透明字形/线稿（可直接用），有的会自带大面积半透明底板
+（必须临时精简）。v0.2.0 在 settings island 里做了一层分类与渲染期覆盖（`transparencyCompat.ts`）：
+
+| 分类 | 样式 | 处理 |
+| --- | --- | --- |
+| `native`（11） | sonnet、classic、cadenza、partita、fume、tilt、claddagh、cappella、diorama | 原样可用（探针 alpha 覆盖 < 24%） |
+| `tuned`（4） | tempera、lumiere（暗色）、pendolo、still | 透明期间给发布的 `visualizerTunings` 合并覆盖：tempera `{showBlocks:false, postProcessGrain:0, postProcessVignette:0}`、lumiere `{darkField:0, textOnly:true}`、pendolo `{showCenterGradient:false}`；still 用作用域 CSS 隐藏其 radial-gradient 底板（文字保留） |
+| `unsupported`（2） | monet（人像底板是样式本体）、lumiere（**浅色主题**，暗场有 94% alpha 下限） | 选中时自动关闭透明背景并回写设置、面板提示；透明下热键也拒绝开启 |
+
+覆盖只写进发布的配置（`buildTuningBundle(settings, { transparent })`），**从不写回设置存储**，所以关掉透明后
+用户原来的 tuning 立刻回来。evidence：真实宿主 + 真实 WebView2 的 6 样式探针（3200x2000，色键后洋红像素
+0.0%）与 16 项布尔构建产物回归断言（另加 3 组 tuning 覆盖参数比对）见 `docs/verification-v0.2.0.md` §1；回归脚本
+`poc/webview/server/compat-regression.mjs`。
+
 ## 5. 已知限制
 
 - 键色是纯洋红 `rgb(255,0,255)`：页面若恰好绘制该像素会被挖空（当前 Folia 主题/歌词不会产生该纯色；属于可接受风险）。
@@ -138,3 +155,6 @@ webView.DefaultBackgroundColor = Color.Black;
   仍然可点，其余位置都落向桌面。
 - 穿透点击是「隐藏捕获窗口 → 合成一次左键 → 恢复」的时序（约 220 ms），极快连点时可能有一次丢失。
 - 透明模式下 `backdrop-filter` 视觉退化（见 §4.2），但控件可点（见 §4.1）。
+- 透明窗口下 `monet` 与浅色主题的 `lumiere` 不可用（样式本体含无法去除的大面积半透明层，见 §4.6）：
+  选中该样式会自动关闭透明背景；`tempera`/`lumiere`(暗色)/`pendolo`/`still` 在透明期间会自动精简，
+  视觉与不透明时略有差异。

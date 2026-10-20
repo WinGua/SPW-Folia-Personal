@@ -346,7 +346,7 @@ class FoliaPlugin(
 
     companion object {
         const val SPW_VERSION = "1.19.0"
-        const val PLUGIN_VERSION = "0.1.11"
+        const val PLUGIN_VERSION = "0.2.0"
 
         /** How long the start-up watcher waits for PF4J to instantiate the playback extension. */
         private const val EXTENSION_WATCH_MS = 20_000L

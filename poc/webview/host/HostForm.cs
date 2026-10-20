@@ -1179,30 +1179,42 @@ namespace SpwFolia
         }
 
         /// <summary>
-        /// Posts one protocol message into the page. MUST run on the WinForms UI thread: the WebView2
-        /// managed wrapper throws <c>InvalidOperationException("CoreWebView2 can only be accessed from
-        /// the UI thread.")</c> when its members are touched from any other thread (WebView2 Runtime
-        /// 155 enforces this; Runtime 150 happened to let the same off-thread COM call pass). Callers
-        /// that can run on the stdin thread are marshalled here instead of taking the window down.
+        /// Posts one protocol message into the page. Caller-agnostic: safe from any thread.
+        ///
+        /// v0.1.11/v0.2.0: WebView2's managed wrapper throws
+        /// <c>InvalidOperationException("CoreWebView2 can only be accessed from the UI thread.")</c>
+        /// when its members are touched from any other thread (WebView2 Runtime 155 enforces this;
+        /// Runtime 150 happened to let the same off-thread COM call pass). The stdin pump calls this
+        /// through HandleStdinLine for lyrics/track/command lines, so the marshalling and the
+        /// readiness checks (including the <c>CoreWebView2</c> property read) must live on the UI
+        /// thread, inside a try/catch: anything else used to kill the whole stdin pump.
         /// </summary>
         private void PostToPage(string payload)
         {
             if (payload == null || closing || IsDisposed) return;
             if (InvokeRequired)
             {
-                SafeBeginInvoke(delegate { PostToPage(payload); });
+                // Already marshalling with BeginInvoke keeps stdin ordering intact (queued FIFO).
+                SafeBeginInvoke(delegate { PostCore(payload); });
                 return;
             }
-            if (!webviewReady || webView == null)
-            {
-                // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
-                // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
-                // track are cached by their callers and flushed on navigation completion.
-                log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
-                return;
-            }
+            PostCore(payload);
+        }
+
+        /// <summary>UI-thread half of <see cref="PostToPage"/>: every WebView2 touch lives here.</summary>
+        private void PostCore(string payload)
+        {
+            if (closing || IsDisposed) return;
             try
             {
+                if (!webviewReady || webView == null)
+                {
+                    // Never let early stdin (allowed by §1) surface as a NullReferenceException: before
+                    // WebView2 is created there is simply no page to post to yet. Settings/config/lyrics/
+                    // track are cached by their callers and flushed on navigation completion.
+                    log.Log("debug", "post-page-skip reason=not-ready bytes=" + Encoding.UTF8.GetByteCount(payload));
+                    return;
+                }
                 CoreWebView2 core = webView.CoreWebView2;
                 if (core == null)
                 {

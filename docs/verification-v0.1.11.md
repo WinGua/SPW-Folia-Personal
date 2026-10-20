@@ -75,13 +75,21 @@ SPW 主线程在 `synchronized` 上排队等一把永远不释放的锁 → **SP
 插件（`spw-folia/.../FoliaHostBridge.kt`）：
 
 3. 新增专职 stdin 写线程 + **有界队列**（容量 256）：队列满时丢最旧一行
-   （全部为可弃状态消息），SPW 任何线程都不再可能阻塞在管道上；写失败置
-   `stdinBroken` 并排空队列。`open()`/`stop()` 的生命周期锁与管道写彻底解耦，
+   （正常负载下丢的是可弃的 `state` 行；极端持续溢出时 `settings` 也可能被丢，重开窗口会重发）。
+   SPW 的 UI/生命周期线程不再因管道写而阻塞，专职写线程自行承受背压（`open/stop` 最多 `join` 500 ms）；
+   写失败置 `stdinBroken` 并排空队列。`open()`/`stop()` 的生命周期锁与管道写彻底解耦，
    `mirrorStdout` 的日志文件锁也改用独立的 `stdoutLogLock`。
 
 ## 验证
 
-### 1. 修复前：必现（本机，Windows 11 x64，SPW 1.19.0 + WebView2 155.0.4283.62）
+> **环境与证据来源**：下面 1/2 两节的数字来自**崩溃机**（Windows 11 x64，SPW 1.19.0 +
+> WebView2 **155.0.4283.62**），由未入库的临时脚本 `repro_stdin_crash.py` 以协议 v1 直接驱动 helper 产生；
+> 脚本与原始 stdout 未提交到仓库（所以这组数字在本仓库不可一键复现）。
+> 开发机（WebView2 **150.0.4078.83**）上 WebView2 对跨线程读 `CoreWebView2` 较宽容，无法直接复现该异常，
+> 本机只用 fixed-version 155 运行时验证过（浏览器进程自身 `BrowserProcessExited` 退出，见
+> `docs/verification-v0.2.0.md` §2.3）。§3 的现场证据来自用户机器。
+
+### 1. 修复前：必现（崩溃机，Windows 11 x64，SPW 1.19.0 + WebView2 155.0.4283.62）
 
 `repro_stdin_crash.py` 直接以协议 v1 驱动已安装的 `spw-folia-host.exe`
 （`--windowed 900x560 --no-topmost`），`ready` 后按序发 `state → lyrics → state →
@@ -115,7 +123,7 @@ stdin pump survived: True
 - 0 条 error 日志（旧版 1 条 InvalidOperationException）；
 - `statesReceived` 从 32 增至 96：`lyrics` 之后的所有 `state` 都被继续消费；
 - `quit` 真正送达（`closed,reason=plugin` 由 quit 触发），退出码 0；
-- 编译仅剩 4 条原有告警，无新增。
+- 编译仅剩 4 条原有告警、无新增（该数字来自崩溃机的构建输出，仓库未保存对应构建日志）。
 
 ### 3. 现场证据链（崩溃机）
 

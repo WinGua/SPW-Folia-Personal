@@ -36,6 +36,10 @@
   「播放页透明背景」：开启后宿主窗口变成真正的透明窗口，Folia 不再绘制背景，歌词与特效直接叠加在桌面或
   其它窗口之上（直播 / OBS 叠加场景）。面板第二行「鼠标穿透（操作桌面）」打开后，点击落向桌面/其它应用，
   而右下角圆钮与右上角齿轮在任何状态下都保持可点。开关随设置树持久化。
+- **透明窗口样式兼容**（v0.2.0）— 透明窗口是色键合成，页面画出的半透明装饰会与键色混合成粉雾。v0.2.0 为
+  14 种样式逐一标注透明兼容级别：11 种可直接透明显示；tempera / lumiere / pendolo / still 在透明开启时
+  自动叠加渲染期精简参数（只影响透明期间，关闭透明立即恢复用户原样）；monet（以及浅色主题下的 lumiere）
+  的大面积半透明层无法移除——选中这些样式时自动关闭透明与鼠标穿透，并在面板里说明原因，避免整屏品红。
 - **封面取色** — 主题、背景与强调色由当前歌曲封面派生（v0.1.2 修复），随封面切换实时变化。
 - **与 SPW 播放同步** — 歌曲、封面、逐字歌词时间轴、翻译字幕、播放/暂停/跳转/倍速，来自
   SPW 播放 API 加一条平滑插值时间轴。
@@ -63,10 +67,35 @@
   齿轮（以及它们打开的面板/设置页）永远可点。也可以按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P /
   Ctrl+Alt+Shift+B）或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
 
+## v0.2.0 更新内容
+
+- **新特性：透明窗口样式兼容** — 透明播放窗口用色键实现：页面画出的 alpha < 1 像素会和键色（纯品红）
+  混合，在真实窗口中变成粉雾。v0.2.0 按「能否在透明窗口下干净显示」把 14 种样式分为三级：
+  **native**（11 种）关掉 Folia 背景后只剩字形/线稿，直接支持透明；**tuned**（凝彩 tempera、绘光
+  lumiere、时计 pendolo、静止 still）自带大面积半透明装饰，透明开启时由发布器自动叠加渲染期 tuning
+  （不写入用户设置，关闭透明后原样恢复）；**unsupported**（莫奈 monet，以及浅色主题下的 lumiere）
+  任何调节都无法移除其半透明层——选中时自动关闭透明背景与鼠标穿透，并在面板里说明原因，避免整屏键色。
+  判定见 `poc/settings-ui/src/model/transparencyCompat.ts`，探针数据与回归见
+  [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md)。
+- **修复：关闭再打开 Folia 后旧的 stdin 写线程泄漏** — 窗口关闭后 bridge 实例会被复用（`onClosed` 只
+  记录日志，`stop()` 仅在插件禁用/删除时调用），旧写线程仍停在空队列的 `take()` 上，队列又是实例共享的，
+  重新打开时旧线程可能取走新会话的行。现在 stdin 队列与写线程改为**每会话独立**：`open()` 先显式退役旧
+  writer（`interrupt` + `join`），`cleanup()` 统一走 `stopStdinWriter()`，旧线程也不可能再污染新队列。
+  `cleanup()` 同时带**会话身份校验**（只清理自己那个 helper 进程）并与 `open()`/`stop()` 共用生命周期锁，
+  旧会话迟到的退出清理不会误清刚重开的窗口。
+- **加固：宿主 stdout 改为非阻塞有界队列** — 辅助进程的协议行/log 行原本在调用线程上同步写管道并
+  flush；插件一旦暂停读取 stdout，宿主 UI 线程就会冻在 `log.Log()` 里（v0.1.10 现场曾出现 ~17 s 无
+  host 行、随后 `0xCFFFFFFF` 退出的记录）。现在改由专职 `spw-folia-stdout` 线程 + 8192 行有界队列
+  输出，`host-exit` 日志额外记录丢弃行数（`dropped=`）。
+- **依赖与排障文档** — 新增 [docs/runtime-requirements.md](docs/runtime-requirements.md)：WebView2
+  Runtime / .NET Framework 4.8 / SPW 1.19.0 的依赖矩阵、退出码含义与闪退排查清单。安装要求中补充
+  系统自带 **.NET Framework 4.8**（Windows 10 1903 起内置）。
+- v0.1.11 的两项崩溃修复一并包含在本版中（见下一节）。
+
 ## v0.1.11 更新内容
 
-- **修复：打开 Folia 后几秒内窗口必闪退，并可连带 SPW 卡死** — 辅助进程的 stdin 泵跑在后台线程上，但 `lyrics`/`track`/`command` 分支直接调用 `webView.CoreWebView2`（连读属性都在 UI 线程检查之内），必抛 `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.`，整个 stdin 读取线程就此终止，2 秒后窗口按「插件退出」流程自杀；负载高时被 Windows 判为挂起（Application Hang 1002）强制结束。现在 `PostToPage` 按 `InvokeRequired` 自动封送到 UI 线程，且 stdin 循环改为**逐行**捕获异常——单条坏行只丢该行，泵永不中断。
-- **修复：辅助进程停止读取时插件可冻结 SPW** — `FoliaHostBridge.sendLine` 原来在共享监视器内做阻塞式管道写，管道被填满后（155 KB 的 track 消息）写线程永久阻塞并握锁不放，而 `open()` 恰由 Compose UI 线程调用，SPW 主线程随之冻结。现在 stdin 由专职写线程 + 有界队列（满则丢最旧状态行）驱动，SPW 任何线程都不再可能阻塞在管道上。
+- **修复：打开 Folia 后几秒内窗口必闪退，并可连带 SPW 卡死** — 辅助进程的 stdin 泵跑在后台线程上，但 `lyrics`/`track`/`command` 分支直接调用 `webView.CoreWebView2`（连读属性都在 UI 线程检查之内），必抛 `InvalidOperationException: CoreWebView2 can only be accessed from the UI thread.`，整个 stdin 读取线程就此终止，2 秒后窗口按「插件退出」流程自杀；负载高时被 Windows 判为挂起（Application Hang 1002）强制结束。现在 `PostToPage` 按 `InvokeRequired` 自动封送到 UI 线程，且 stdin 循环改为**逐行**捕获异常——单条协议消息的异常只丢该行（管道/读取级错误仍按退出流程处理）。
+- **修复：辅助进程停止读取时插件可冻结 SPW** — `FoliaHostBridge.sendLine` 原来在共享监视器内做阻塞式管道写，管道被填满后（实测 155 KB、上限约 213 KB 的 track 消息）写线程永久阻塞并握锁不放，而 `open()` 恰由 Compose UI 线程调用，SPW 主线程随之冻结。现在 stdin 由专职写线程 + 有界队列（满则丢最旧状态行；正常负载下丢的是 state，极端溢出时可能丢 settings，重开窗口会重发）驱动，SPW 的 UI/生命周期线程不再可能因管道写而阻塞，只有专职写线程自行承受背压（`open/stop` 最多 `join` 500 ms）。
 - 证据链（崩溃现场三条 `Application Hang (1002)`、两次 `InvalidOperationException`、退出码 `0xCFFFFFFF`）与修复前后同脚本复现对比见 [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md)。
 
 ## v0.1.10 更新内容
@@ -206,6 +235,7 @@
 | v0.1.9：鼠标穿透开关（`passthrough=on rects=3` → 点桌面 `passthrough=click at=1600,560` → catcher 恢复）、穿透下圆钮/齿轮/设置页返回键可点、热键退出后 `mode=off` + `passthrough=off` | [docs/verification-v0.1.9.md](docs/verification-v0.1.9.md) |
 | v0.1.10：滚轮向下崩溃修复（旧二进制投递 `WM_MOUSEWHEEL wparam=0xFF880000` 必抛 `OverflowException` 并弹出「Microsoft .NET Framework」对话框；新二进制反射级 15/15、真机级 0 弹窗、0 error 日志） | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
 | v0.1.11：stdin 泵跨线程访问 WebView2 崩溃修复（旧二进制收到 `lyrics` 后 30 ms 内抛 `InvalidOperationException` 并 2 s 后自杀，`statesReceived` 停在 32；新二进制 0 error、`statesReceived=96`、`quit` 正常送达退出码 0） | [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md) |
+| v0.2.0：透明窗口样式兼容（14 种样式逐项判定 native/tuned/unsupported；tempera/lumiere/pendolo/still 透明时自动精简、关透明恢复；monet 与浅色 lumiere 自动关透明并在面板提示）＋ 桥重开后旧写线程清理 ＋ 宿主 stdout 非阻塞队列（6 s stdout 暂停洪泛后 0 error、exit 0、`dropped=0`） | [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -218,7 +248,7 @@ Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。另需系统自�
 （Windows 10 1903 起内置）。完整依赖矩阵、退出码与闪退排查见
 [docs/runtime-requirements.md](docs/runtime-requirements.md)。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.1.11.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.2.0.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -235,7 +265,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.1.10.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.0.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -248,8 +278,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.1.10.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.1.11.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.0.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.0.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

@@ -63,7 +63,7 @@ const App: React.FC<AppProps> = ({ injected }) => {
     /* v0.1.7: the transparent player background makes the host window click-through, so the host
      * turns it back off with a global hotkey (Ctrl+Alt+B) and calls this hook to keep the switch and
      * the persisted setting in sync.
-     * v0.1.11: the store refuses transparency for styles that cannot render it (monet, lumiere on a
+     * v0.2.0: the store refuses transparency for styles that cannot render it (monet, lumiere on a
      * light theme). The host has already keyed the window by the time this runs, so push the
      * corrected settings back explicitly instead of waiting for a store change that never happens. */
     useEffect(() => {
@@ -100,7 +100,7 @@ const App: React.FC<AppProps> = ({ injected }) => {
         };
     }, []);
 
-    /* v0.1.11: styles that cannot run under the colour key (see model/transparencyCompat.ts) are
+    /* v0.2.0: styles that cannot run under the colour key (see model/transparencyCompat.ts) are
      * patched through CSS instead — the root flag lets app.css drop the one full-screen plate that a
      * style has no tuning switch for (currently only `still`'s vignette). */
     useEffect(() => {
@@ -214,7 +214,7 @@ const App: React.FC<AppProps> = ({ injected }) => {
     }, []);
 
     const styleEntry = getStyleEntry(visualizerMode);
-    /** v0.1.11: does the selected style survive the transparent window, and does it need a downgrade? */
+    /** v0.2.0: does the selected style survive the transparent window, and does it need a downgrade? */
     const styleCompat = getStyleTransparencyCompat(visualizerMode, { isDaylight: state.isDaylightTheme });
     const styleLabel = t(styleEntry.labelKey) || styleEntry.labelFallback;
     const compatNote = styleCompat === 'unsupported'
