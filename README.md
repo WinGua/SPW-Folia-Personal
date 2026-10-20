@@ -67,6 +67,15 @@
   齿轮（以及它们打开的面板/设置页）永远可点。也可以按 **Ctrl+Alt+B**（备用 Ctrl+Alt+Y / Ctrl+Alt+P /
   Ctrl+Alt+Shift+B）或 ESC 退出播放。细节见 [docs/live-transparency.md](docs/live-transparency.md)。
 
+## v0.2.1 更新内容
+
+- **修复：浅色主题下「更多」菜单里的 Folia 条目几乎不可见** — 注入项的文字与图标颜色此前硬编码为
+  深色弹窗的采样值 `#EBEEF1`，SPW 浅色主题下弹窗底色变浅，浅色文字直接「隐形」。宿主自己的菜单项
+  并不写死颜色：`MenuFlyoutItemCompat` 的 `contentColor` 参数默认值就是宿主主题面板的内容色
+  （`androidx.compose.ui.ʰ.Ԩ(composer).Ԩ()`），随浅/深主题切换。现在注入项通过反射走同一条调用链
+  读取宿主主题色（面板颜色存在 `MutableState` 里，组合期读取即订阅，主题切换会自动重组），
+  反射失败时回退旧常量。字节级证据见 [docs/verification-v0.2.1.md](docs/verification-v0.2.1.md)。
+
 ## v0.2.0 更新内容
 
 - **新特性：透明窗口样式兼容** — 透明播放窗口用色键实现：页面画出的 alpha < 1 像素会和键色（纯品红）
@@ -236,6 +245,7 @@
 | v0.1.10：滚轮向下崩溃修复（旧二进制投递 `WM_MOUSEWHEEL wparam=0xFF880000` 必抛 `OverflowException` 并弹出「Microsoft .NET Framework」对话框；新二进制反射级 15/15、真机级 0 弹窗、0 error 日志） | [docs/verification-v0.1.10.md](docs/verification-v0.1.10.md) |
 | v0.1.11：stdin 泵跨线程访问 WebView2 崩溃修复（旧二进制收到 `lyrics` 后 30 ms 内抛 `InvalidOperationException` 并 2 s 后自杀，`statesReceived` 停在 32；新二进制 0 error、`statesReceived=96`、`quit` 正常送达退出码 0） | [docs/verification-v0.1.11.md](docs/verification-v0.1.11.md) |
 | v0.2.0：透明窗口样式兼容（14 种样式逐项判定 native/tuned/unsupported；tempera/lumiere/pendolo/still 透明时自动精简、关透明恢复；monet 与浅色 lumiere 自动关透明并在面板提示）＋ 桥重开后旧写线程清理 ＋ 宿主 stdout 非阻塞队列（6 s stdout 暂停洪泛后 0 error、exit 0、`dropped=0`） | [docs/verification-v0.2.0.md](docs/verification-v0.2.0.md) |
+| v0.2.1：Folia 菜单项颜色跟随宿主主题（`MenuFlyoutItemCompat` 的 `contentColor` 默认值 = `ʰ.Ԩ(composer).Ԩ()` 字节级确认；注入项反射读同一主题面板，浅/深主题均与宿主条目一致） | [docs/verification-v0.2.1.md](docs/verification-v0.2.1.md) |
 | 发布产物中全部 14 种样式均可渲染（15/15 扫描，0 页面错误，0 外部网络请求）；在干净目录解包的 RC 产物通过 19/19 布局/协议检查 | [docs/release-candidate.md](docs/release-candidate.md) |
 | 完整验收矩阵（切歌 / 跳转 / 暂停 / 无歌词 / 生命周期 / 持久化 / 长稳） | [docs/acceptance-run.md](docs/acceptance-run.md), [docs/acceptance-report.md](docs/acceptance-report.md) |
 
@@ -248,7 +258,7 @@ Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）。另需系统自�
 （Windows 10 1903 起内置）。完整依赖矩阵、退出码与闪退排查见
 [docs/runtime-requirements.md](docs/runtime-requirements.md)。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.2.0.spmod`（Windows x64）。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 页面下载 `spw-folia-0.2.1.spmod`（Windows x64）。
 2. 在 SPW 中：**设置 → 插件 / 创意工坊 → 导入插件**，选择该 `.spmod`，启用它，并在询问时授予
    **class-transform**（「钩子」）权限（更多菜单 hook 需要）。
 3. 若插件管理器提示需要，重启 SPW。
@@ -265,7 +275,7 @@ Windows 自带 `csc.exe`（.NET Framework 4.8，用于原生辅助进程）。�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.0.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.1.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -278,8 +288,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.0.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.2.0.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.1.spmod
 ::    完整脚本化组装与本地安装测试流程见 docs/release.md。
 ```
 

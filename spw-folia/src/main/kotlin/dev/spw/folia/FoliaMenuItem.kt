@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.currentComposer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.lang.reflect.Method
 
 /**
  * Content of the injected "Folia" item inside SPW's mini-player 更多 flyout.
@@ -31,10 +33,13 @@ import androidx.compose.ui.unit.sp
  */
 @Composable
 internal fun FoliaMenuItemContent() {
-    // Color sampled from SPW 1.19.0's own flyout labels/icons (#EBEEF1). The host
-    // popup is a fixed dark flyout; the plain BasicText default (black) was the
-    // reason the injected label used to look out of place.
-    val contentColor = Color(0xFFEBEEF1)
+    // The host's own items do NOT hardcode a colour: MenuFlyoutItemCompat's contentColor
+    // parameter defaults to `androidx.compose.ui.ʰ.Ԩ(composer).Ԩ()`, i.e. the content
+    // colour of SPW's theme palette, which follows light/dark (v0.1.11 hardcoded the
+    // dark-flyout sample #EBEEF1 and became invisible on the light flyout). We mimic the
+    // exact host call through reflection so the injected item adapts the same way; if the
+    // host internals ever change we silently fall back to the old constant.
+    val contentColor = hostFlyoutContentColor() ?: Color(0xFFEBEEF1)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -54,6 +59,46 @@ internal fun FoliaMenuItemContent() {
         )
         Spacer(Modifier.width(11.dp))
     }
+}
+
+/**
+ * `androidx.compose.ui.ʰ.Ԩ(Composer): androidx.compose.ui.ʹ` —
+ * reads SPW's theme palette object from the composition (same call the host's
+ * MenuFlyoutItemCompat makes for its default contentColor).
+ */
+private val hostThemePaletteMethod: Method? by lazy {
+    runCatching {
+        Class.forName("androidx.compose.ui.ʰ")
+            .getDeclaredMethod("Ԩ", androidx.compose.runtime.Composer::class.java)
+            .apply { isAccessible = true }
+    }.getOrNull()
+}
+
+/**
+ * `androidx.compose.ui.ʹ.Ԩ(): long` — the palette's content colour, packed as a
+ * Compose [Color] long. The palette stores its colours in `MutableState` fields, so
+ * reading it during composition also subscribes us to theme changes.
+ */
+private val hostPaletteColorMethod: Method? by lazy {
+    runCatching {
+        Class.forName("androidx.compose.ui.ʹ")
+            .getDeclaredMethod("Ԩ")
+            .apply { isAccessible = true }
+    }.getOrNull()
+}
+
+/** Current host flyout content colour, or null when the host theme API is unavailable. */
+@Composable
+private fun hostFlyoutContentColor(): Color? {
+    val readPalette = hostThemePaletteMethod ?: return null
+    val readColor = hostPaletteColorMethod ?: return null
+    // `currentComposer` is a @Composable read, so it must happen outside runCatching
+    // (the Compose compiler rejects composable calls inside it).
+    val composer = currentComposer
+    return runCatching {
+        val palette = readPalette.invoke(null, composer) ?: return null
+        Color((readColor.invoke(palette) as Long).toULong())
+    }.getOrNull()
 }
 
 /** Folia's two-sparkle mark, drawn monochrome so it matches SPW's line icons. */
