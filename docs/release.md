@@ -268,6 +268,7 @@ every `.spmod`).
 | v0.1.2 | 12,450,848 | 1,938 | `2dc2f46b8635bd4918f45b65e9cd36d814c876e8c9f5a7827da4d0621174a0b9` | 2026-10-19 |
 | v0.1.3 | 12,405,289 | 1,937 | `16bdda573be6f9fed29780881e94feb1f5c0a6d542260c024e4f284c8a5d41ea` | 2026-10-19 |
 | v0.1.4 | 12,405,269 | 1,937 | `24ddaf34982a6acb9b92943ead1123d6dfb34ed4c9ae082c94ed2e7d1d82c04e` | 2026-10-19 |
+| v0.1.5 | 12,574,908 | 1,937 | `8e88488ba9d4137602c550a1633c98b2b45d2a4ebf578822f7412940d9655c11` | local only |
 | v0.1.6 | 13,136,350 | 1,941 | `aacd02afb078b13d09a26930f6981740930df5dfe04343b7a9584cfd84bdcad9` | 2026-10-19 |
 | v0.1.7 | 12,970,892 | 1,941 | `5cf8eba69c9d1bb961efd160075c29b9cde52e5b30699598e5ec174106dd5138` | 2026-10-19 |
 | v0.1.8 | 12,976,142 | 1,941 | `0913914b37ba5a1b4b8db7775ebb1b7ab1621d1a069a000c43766c4c62b9ad1f` | local only |
@@ -275,6 +276,10 @@ every `.spmod`).
 | v0.1.10 | 13,145,163 | 1,941 | `4a90d09e95ea37449882f6b7507fcfa3d0ccdf72d86dbc969b26d6426cbcf951` | 2026-10-19 |
 | v0.2.0 | 13,149,053 | 1,941 | `d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb` | 2026-10-20 |
 | **v0.2.1** | **13,152,604** | **1,941** | `56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792` | 2026-10-20 |
+
+`local only` builds were verified on a real install but never uploaded; their changes shipped inside
+the next published release. v0.1.11 was never built as a standalone artifact either — its two fixes
+(see [`archive/verification-v0.1.11.md`](archive/verification-v0.1.11.md)) went out with v0.2.0.
 
 Current release payload (v0.2.1): plugin classes 94,303 B (`68facfed…`), native host 130,560 B
 (`2aa1f6c2…`, unchanged since v0.2.0), settings island 1,071,968 B (`eeb8a128…`, unchanged since

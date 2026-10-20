@@ -77,17 +77,21 @@ notes, verification reports and acceptance evidence — kept for traceability on
 | --- | --- |
 | **v0.2.1** | The Folia entry in the More menu follows the host theme under the light theme; CLR activation failure fixed for the Store (MSIX) channel |
 | v0.2.0 | Transparent-window style compatibility tiers (native / tuned / unsupported); fixed the stale stdin-writer thread leaking after a bridge restart; hardened the host stdout path with a bounded non-blocking queue; added [runtime requirements & troubleshooting](docs/runtime-requirements.md) |
-| v0.1.11 | Fixed an unconditional crash from the stdin pump touching WebView2 cross-thread (could also freeze SPW); fixed plugin write-pipe blocking that froze SPW |
+| v0.1.11 * | Fixed an unconditional crash from the stdin pump touching WebView2 cross-thread (could also freeze SPW); fixed plugin write-pipe blocking that froze SPW |
 | v0.1.10 | Fixed `OverflowException` crash in the helper when scrolling down in transparent mode; unhandled exceptions are now logged |
 | v0.1.9 | Added *鼠标穿透（操作桌面）* to the button panel; the dial, gear and panel hitboxes stay clickable; removed the persistent bottom-left pommel |
-| v0.1.8 | Lyrics switch with the track (independent lyric polling), faster cover/theme follow, the mouse is clickable inside the transparent window |
+| v0.1.8 * | Lyrics switch with the track (independent lyric polling), faster cover/theme follow, the mouse is clickable inside the transparent window |
 | v0.1.7 | Transparent playback page (colour-key transparent window + Ctrl+Alt+B restore); chrome stays unblurred while transparent |
 | v0.1.6 | The settings-page preview is now the real Folia renderer in an iframe (fully still when paused) |
+| v0.1.5 * | Settings preview gained a Ken Burns drift and a working pause/play button (replaced by the real renderer in v0.1.6) |
 | v0.1.4 | Fixed the style preview not following the selected style (crossfade effect cancelling itself) |
 | v0.1.3 | Mod-manager author is now `azkbzxf`; removed every setting that could not take effect; fixed font/subtitle settings being inert |
 | v0.1.2 | Fixed cover-colour theming (`coverDataUrl` / `coverUrl` mismatch); removed the smart-motion switch |
 | v0.1.1 | The More-menu entry now matches the host's native items; cursor auto-hide and settings-panel loop fixes |
 | v0.1.0 | First release: menu hook, fullscreen Folia renderer, 14 styles, settings page, audio analysis |
+
+`*` marks builds that were only ever made locally and never published to GitHub Releases (their
+changes shipped inside the following releases).
 
 The release artifacts were accepted end-to-end on a real SPW 1.19.0 on Windows 11 (menu entry →
 fullscreen render, 14-style 15/15 sweep, 0 page errors, 0 external network requests, 16-minute soak,
