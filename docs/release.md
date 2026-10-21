@@ -2,7 +2,7 @@
 
 Status: **complete** (task-8). `packaging/` holds the exact payload of the final `.spmod`; the
 assembly script, checksums, size budget and a scripted packaged-layout acceptance test are included.
-Last verified: 2026-10-20 (v0.2.1 release artifact; host `spw-folia-host.exe` 130,560 B, WebView2 150.0.4078.83).
+Last verified: 2026-10-21 (v0.2.2 release artifact; host `spw-folia-host.exe` 131,584 B, WebView2 150.0.4078.83).
 
 ## 1. What ships
 
@@ -275,19 +275,20 @@ every `.spmod`).
 | v0.1.9 | 12,975,396 | 1,941 | `8ec1ffb3e4dee3c4befbc953f7d36a22ab1864e5e204439c7c16a5233257ce01` | 2026-10-19 |
 | v0.1.10 | 13,145,163 | 1,941 | `4a90d09e95ea37449882f6b7507fcfa3d0ccdf72d86dbc969b26d6426cbcf951` | 2026-10-19 |
 | v0.2.0 | 13,149,053 | 1,941 | `d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb` | 2026-10-20 |
-| **v0.2.1** | **13,152,604** | **1,941** | `56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792` | 2026-10-20 |
+| v0.2.1 | 13,152,604 | 1,941 | `56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792` | 2026-10-20 |
+| **v0.2.2** | **13,153,013** | **1,941** | `ca74c7fc4b6ce807af582f8dcbae041f4001bbf8b291e86e3be29a30f9fa38ac` | 2026-10-21 |
 
 `local only` builds were verified on a real install but never uploaded; their changes shipped inside
 the next published release. v0.1.11 was never built as a standalone artifact either — its two fixes
 (see [`archive/verification-v0.1.11.md`](archive/verification-v0.1.11.md)) went out with v0.2.0.
 
-Current release payload (v0.2.1): plugin classes 94,303 B (`68facfed…`), native host 130,560 B
-(`2aa1f6c2…`, unchanged since v0.2.0), settings island 1,071,968 B (`eeb8a128…`, unchanged since
-v0.2.0), complete Folia 0.7.21 OBS bundle + licenses. Staged payload: 1,910 files / 23.41 MB
-(web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB) against a 25 MB budget.
-Verify a downloaded artifact with:
+Current release payload (v0.2.2): plugin classes 94,303 B (`4893ce14…`), native host 131,584 B
+(`e4248044…`, reworked input path — shaped-region hit testing), settings island 1,071,968 B
+(`eeb8a128…`, unchanged since v0.2.0), complete Folia 0.7.21 OBS bundle + licenses. Staged payload:
+1,910 files / 23.41 MB (web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB) against a
+25 MB budget. Verify a downloaded artifact with:
 
 ```bash
-sha256sum spw-folia-0.2.1.spmod    # compare with the ledger row and the release's SHA256SUMS.txt
+sha256sum spw-folia-0.2.2.spmod    # compare with the ledger row and the release's SHA256SUMS.txt
 node packaging/tools/verify-layout.mjs   # packaged-layout acceptance on a clean unpack
 ```

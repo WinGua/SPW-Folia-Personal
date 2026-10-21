@@ -145,15 +145,38 @@ webView.DefaultBackgroundColor = Color.Black;
 0.0%）与 16 项布尔构建产物回归断言（另加 3 组 tuning 覆盖参数比对）见 `docs/archive/verification-v0.2.0.md` §1；回归脚本
 `poc/webview/server/compat-regression.mjs`。
 
+## 4.7 v0.2.2：穿透重构为系统级 shaped region（借鉴 SPW-island）
+
+v0.1.9 的「合成点击回放」只回放左键，右键/滚轮/悬停被整吞、拖拽必断，合成输入还会被提权窗口与反作弊拦截。
+v0.2.2 借鉴 SPW-island 的 shaped input peer 思路（`WindowsGpuInput.kt`：非激活 1/255 alpha 小窗 +
+`window.shape` 反选区域），把穿透改成 **捕获窗口的窗口区域（window region）就是命中测试**：
+
+- `TransparencyInputCatcher.ApplyHitRegion(List<Rectangle> rects)`：把页面 hitbox 矩形换算成窗口像素
+  （CSS → client 按 `ClientSize/hitViewport` 缩放，四周放大 ±4 CSS px 容差），`CreateRectRgn` +
+  `CombineRgn(RGN_OR)` 合成后 `SetWindowRgn`。区域之外的输入在 OS 命中测试层直接穿给下层窗口——
+  点击、右键、滚轮、悬停、拖拽全部真实穿透，零合成输入（提权窗口/反作弊场景同样可用）。
+- fail-open：`mousePassthrough` 关闭、页面未上报矩形或 viewport 非法时区域置空（整窗可点）。
+  「宁可多点到页面，也不吞掉用户的点击」。
+- 拖拽连续性：热区内按下任一鼠标键即把区域临时扩展为整窗（`catcherDragActive`），全部按键抬起后恢复；
+  若 button-up 被 WebView2 捕获吃掉，下一次移动用 `GetAsyncKeyState` 自愈，区域不会永久保持整窗。
+- 区域重建时机：页面 hitbox 更新（`UpdateHitRegions`）、bounds 变化（`SyncInputCatcherBounds` /
+  `ApplyInputCatcherBounds`）、穿透开关（`ApplyTransparencyFromSettings`）、句柄重建（`OnHandleCreated`）。
+- 删除 v0.1.9 的 `mouse_event` 回放、`catcherRestoreAt` 220ms 恢复时序、`IsInteractiveAt` 逐点命中与
+  `FallThroughToDesktop`；`Forward` 改为无条件转发到达的消息（能到达 = 在区域内）。v0.1.10 的
+  `unchecked((int)ToInt64())` 参数窄化修复与 `MakeLParam` 双半字掩码原样保留。
+- 对照 SPW-island：其「`SetWindowLong(GWL_EXSTYLE, WS_EX_TRANSPARENT|WS_EX_LAYERED)` 整窗穿透 +
+  shaped 小窗反选区域」双窗方案，被折叠成单一「区域化捕获窗」——等价的 OS 命中测试语义，窗口数减半。
+
 ## 5. 已知限制
 
 - 键色是纯洋红 `rgb(255,0,255)`：页面若恰好绘制该像素会被挖空（当前 Folia 主题/歌词不会产生该纯色；属于可接受风险）。
 - 透明就是「透到桌面/其它窗口」，不是 OBS 浏览器的 alpha 源——OBS 场景请直接用 Folia 的浏览器源，或用窗口捕获。
 - 仅主屏全屏（与 v0.1.0 起一致）；多屏选择未实现。
 - 透明模式默认会捕获鼠标（v0.1.8 的输入捕获窗口）；要操作下层窗口请打开面板里的「鼠标穿透（操作桌面）」，
-  或按 Ctrl+Alt+B / ESC 退出透明。打开穿透后，只有两个浮标（右下角圆钮、右上角齿轮）、它们的面板/设置页
-  仍然可点，其余位置都落向桌面。
-- 穿透点击是「隐藏捕获窗口 → 合成一次左键 → 恢复」的时序（约 220 ms），极快连点时可能有一次丢失。
+  或按 Ctrl+Alt+B / ESC 退出透明。打开穿透后仅热区（右下角圆钮、右上角齿轮及其面板/设置页）可点，
+  其余位置的点击/右键/滚轮/悬停/拖拽由系统直接落向下层窗口（v0.2.2，见 §4.7）。
+- 穿透热区来自页面上报的 hitbox 矩形（±4 CSS px 容差）；上报缺失或解析失败时退化为整窗可点（fail-open）。
+  按住拖拽期间热区临时扩展为整窗，松开按键即恢复。
 - 透明模式下 `backdrop-filter` 视觉退化（见 §4.2），但控件可点（见 §4.1）。
 - 透明窗口下 `monet` 与浅色主题的 `lumiere` 不可用（样式本体含无法去除的大面积半透明层，见 §4.6）：
   选中该样式会自动关闭透明背景；`tempera`/`lumiere`(暗色)/`pendolo`/`still` 在透明期间会自动精简，

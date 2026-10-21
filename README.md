@@ -52,7 +52,7 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
 1903 起内置）。完整依赖矩阵与闪退排查见
 [docs/runtime-requirements.md](docs/runtime-requirements.md)。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 下载 `spw-folia-0.2.1.spmod`。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 下载 `spw-folia-0.2.2.spmod`。
 2. SPW → **设置 → 插件 / 创意工坊 → 导入插件**，选择该文件并启用；询问时授予 **class-transform**
    （「钩子」）权限——菜单 hook 需要它。
 3. 插件管理器提示时重启 SPW。
@@ -76,7 +76,7 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
 
 ## 版本
 
-当前 **v0.2.1**。每个版本的 `.spmod` 与 SHA-256 校验值都在
+当前 **v0.2.2**。每个版本的 `.spmod` 与 SHA-256 校验值都在
 [GitHub Releases](https://github.com/azkbzxf/spw-folia/releases)；逐版变更与验收证据归档在
 [docs/archive/](docs/archive/)，仓库内不再重复。
 
@@ -91,7 +91,7 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.1.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.2.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -104,8 +104,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.2.1.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.2.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.2.2.spmod
 ```
 
 完整的打包流水线、payload 清单、大小预算与发布检查表见 [docs/release.md](docs/release.md)。

@@ -126,19 +126,15 @@ namespace SpwFolia
         private double hitViewportWidth;
         private double hitViewportHeight;
         private readonly List<RectangleF> hitRegionsCss = new List<RectangleF>();
-        private long catcherRestoreAt = -1;
+        // v0.2.2: while a button is held down inside an interactive rectangle the catcher region is
+        // dropped for the whole window so a drag cannot slip out of the page's hands.
+        private bool catcherDragActive;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
-
-        private const uint MouseEventLeftDown = 0x0002;
-        private const uint MouseEventLeftUp = 0x0004;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern IntPtr PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
@@ -283,6 +279,8 @@ namespace SpwFolia
                 mousePassthrough = passthrough;
                 log.Log("info", "transparency passthrough=" + (passthrough ? "on" : "off")
                     + " rects=" + hitRegionsCss.Count);
+                // v0.2.2: the catcher window region is the hit test — re-apply it on every toggle.
+                ApplyInputCatcherRegion();
             }
             // Keep the target in sync with the page even when the window is already in that mode:
             // exiting via the badge/hotkey leaves the page switch on, so the next "on" must re-apply.
@@ -403,8 +401,9 @@ namespace SpwFolia
                 if (inputCatcher == null)
                 {
                     inputCatcher = new TransparencyInputCatcher(TargetInputHandle);
-                    inputCatcher.ShouldForward = IsInteractiveAt;
-                    inputCatcher.FallThrough = FallThroughToDesktop;
+                    // v0.2.2: region-based pass-through — the catcher only receives what the page
+                    // claims, and reports button holds so a drag can expand to the whole window.
+                    inputCatcher.DragStateChanged = OnCatcherDragStateChanged;
                 }
                 ApplyInputCatcherBounds();
                 if (transparencyActive && inputCatcher != null && inputCatcher.Visible)
@@ -427,6 +426,7 @@ namespace SpwFolia
                 if (inputCatcher.Bounds != Bounds)
                 {
                     inputCatcher.Bounds = Bounds;
+                    ApplyInputCatcherRegion();
                     inputCatcher.BringToFront();
                     log.Log("info", "transparency mouse=catcher synced bounds=" + inputCatcher.Bounds);
                 }
@@ -437,7 +437,13 @@ namespace SpwFolia
         private void ApplyInputCatcherBounds()
         {
             if (inputCatcher == null) return;
-            try { inputCatcher.Bounds = Bounds; } catch (Exception) { }
+            try
+            {
+                inputCatcher.Bounds = Bounds;
+                // v0.2.2: the region scales with the window — rebuild it alongside the bounds.
+                ApplyInputCatcherRegion();
+            }
+            catch (Exception) { }
         }
 
         private void HideInputCatcher()
@@ -521,48 +527,64 @@ namespace SpwFolia
                 hitViewportHeight = vh;
                 hitRegionsCss.Clear();
                 hitRegionsCss.AddRange(next);
+                // v0.2.2: page rects changed — rebuild the catcher window region (= hit test).
+                ApplyInputCatcherRegion();
             }
             catch (Exception ex) { log.Error("hitbox", ex); }
         }
 
-        /// <summary>True when the page may take this screen point (chrome floats / panel / overlay).</summary>
-        private bool IsInteractiveAt(Point screen)
+        /// <summary>
+        /// v0.2.2 (SPW-island shaped-input-peer model): the catcher window's region IS the hit test.
+        /// The page's interactive rectangles are scaled from CSS pixels to window pixels, inflated by
+        /// the same ±4 CSS px of slop the v0.1.9 point test used, and unioned into a window region via
+        /// SetWindowRgn. Windows then delivers input only inside those rectangles and hands everything
+        /// outside — clicks, wheel, hover, drags — to the window below at OS hit-test level. No
+        /// synthetic input any more, so elevated windows and anti-cheat games work too.
+        /// Fail-open: no rects / bad viewport / passthrough off -> null region (whole window).
+        /// While a button is held (catcherDragActive) the region is dropped for drag continuity.
+        /// </summary>
+        private void ApplyInputCatcherRegion()
         {
-            if (!mousePassthrough) return true;
-            if (hitRegionsCss.Count == 0 || hitViewportWidth <= 0 || hitViewportHeight <= 0) return true;
+            if (inputCatcher == null) return;
             try
             {
-                Point client = PointToClient(screen);
-                double scaleX = ClientSize.Width / hitViewportWidth;
-                double scaleY = ClientSize.Height / hitViewportHeight;
-                if (scaleX <= 0 || scaleY <= 0) return true;
-                double cssX = client.X / scaleX;
-                double cssY = client.Y / scaleY;
-                for (int i = 0; i < hitRegionsCss.Count; i++)
+                List<Rectangle> rects = null;
+                if (mousePassthrough && !catcherDragActive
+                    && hitRegionsCss.Count > 0 && hitViewportWidth > 0 && hitViewportHeight > 0)
                 {
-                    RectangleF r = hitRegionsCss[i];
-                    if (cssX >= r.Left - 4 && cssX <= r.Right + 4 && cssY >= r.Top - 4 && cssY <= r.Bottom + 4) return true;
+                    double scaleX = inputCatcher.ClientSize.Width / hitViewportWidth;
+                    double scaleY = inputCatcher.ClientSize.Height / hitViewportHeight;
+                    if (scaleX > 0 && scaleY > 0)
+                    {
+                        rects = new List<Rectangle>();
+                        Rectangle clip = new Rectangle(Point.Empty, inputCatcher.ClientSize);
+                        for (int i = 0; i < hitRegionsCss.Count; i++)
+                        {
+                            RectangleF r = hitRegionsCss[i];
+                            Rectangle rect = Rectangle.Round(new RectangleF(
+                                (float)((r.Left - 4) * scaleX), (float)((r.Top - 4) * scaleY),
+                                (float)((r.Width + 8) * scaleX), (float)((r.Height + 8) * scaleY)));
+                            rect.Intersect(clip);
+                            if (rect.Width > 0 && rect.Height > 0) rects.Add(rect);
+                        }
+                    }
                 }
+                inputCatcher.ApplyHitRegion(rects);
             }
-            catch (Exception ex) { log.Error("hitbox-hit", ex); return true; }
-            return false;
+            catch (Exception ex) { log.Error("transparency-mouse", ex); }
         }
 
-        /// <summary>
-        /// The catcher swallowed a press the page does not want. Hide it, replay a real click so the
-        /// window underneath gets both the down and the up, then put the catcher back shortly after.
-        /// </summary>
-        private void FallThroughToDesktop(Point screen)
+        /// <summary>Catcher drag bookkeeping: expand to the whole window while a button is held.</summary>
+        private void OnCatcherDragStateChanged(bool dragging)
         {
             try
             {
-                HideInputCatcher();
-                mouse_event(MouseEventLeftDown, 0, 0, 0, UIntPtr.Zero);
-                mouse_event(MouseEventLeftUp, 0, 0, 0, UIntPtr.Zero);
-                catcherRestoreAt = clock.ElapsedMilliseconds + 220;
-                log.Log("info", "transparency passthrough=click at=" + screen.X + "," + screen.Y);
+                if (catcherDragActive == dragging) return;
+                catcherDragActive = dragging;
+                log.Log("info", "transparency mouse=catcher drag=" + (dragging ? "on" : "off"));
+                ApplyInputCatcherRegion();
             }
-            catch (Exception ex) { log.Error("passthrough", ex); }
+            catch (Exception ex) { log.Error("transparency-mouse", ex); }
         }
         private void SyncPageTransparency(bool on)
         {
@@ -1059,11 +1081,6 @@ namespace SpwFolia
         private void OnTick(object sender, EventArgs e)
         {
             SyncInputCatcherBounds();
-            if (catcherRestoreAt >= 0 && clock.ElapsedMilliseconds >= catcherRestoreAt)
-            {
-                catcherRestoreAt = -1;
-                if (transparencyActive) ShowInputCatcher();
-            }
             TrackCursor();
             long now = clock.ElapsedMilliseconds;
             long elapsed = now - lastTick;
@@ -1785,6 +1802,12 @@ namespace SpwFolia
     /// NOT colour-keyed, so it still receives mouse input, and forwards every event into the WebView2
     /// input child window. That makes the transparent player page clickable while the desktop keeps
     /// showing through wherever the page paints transparent.
+    ///
+    /// v0.2.2 (SPW-island shaped input peer): the window region IS the hit test — ApplyHitRegion
+    /// unions the page's interactive rectangles into a SetWindowRgn shape, so input outside them falls
+    /// through to the window below natively (right-click, wheel, hover and drags included). While a
+    /// button is held the region is dropped so a drag keeps receiving its moves and cannot be
+    /// swallowed when the pointer leaves one rectangle.
     /// </summary>
     internal sealed class TransparencyInputCatcher : Form
     {
@@ -1815,14 +1838,32 @@ namespace SpwFolia
             public int Y;
         }
 
+        private const int VK_LBUTTON = 0x01;
+        private const int VK_RBUTTON = 0x02;
+        private const int RGN_OR = 2;
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern IntPtr CreateRectRgn(int x1, int y1, int x2, int y2);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern int CombineRgn(IntPtr hDest, IntPtr hSrc1, IntPtr hSrc2, int fnCombineMode);
+
+        [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
+
         private readonly Func<IntPtr> target;
-        private int forwarded;
+        private int buttonsDown;
+        private bool dragActive;
+        private List<Rectangle> lastRegionRects;
 
-        /// <summary>Decides whether an event may reach the page; false lets the desktop have it.</summary>
-        public Func<Point, bool> ShouldForward;
-
-        /// <summary>Called for a press that should reach the desktop instead (v0.1.9 passthrough).</summary>
-        public Action<Point> FallThrough;
+        /// <summary>Raised when the held-button state changes (true = drag in progress).</summary>
+        public Action<bool> DragStateChanged;
 
         public TransparencyInputCatcher(Func<IntPtr> inputHandle)
         {
@@ -1857,6 +1898,8 @@ namespace SpwFolia
             base.OnHandleCreated(e);
             // alpha 1/255 is invisible to the eye but keeps the window hit-testable
             SetLayeredWindowAttributes(Handle, 0, 1, LWA_ALPHA);
+            // v0.2.2: handle recreation drops the window region — put the last shape back.
+            ApplyHitRegion(lastRegionRects);
         }
 
         protected override void WndProc(ref Message m)
@@ -1893,29 +1936,107 @@ namespace SpwFolia
                 pt.X = screen.X;
                 pt.Y = screen.Y;
             }
-            Func<Point, bool> allow = ShouldForward;
-            if (allow != null && !allow(new Point(pt.X, pt.Y)))
-            {
-                // v0.1.9: "鼠标穿透" — this press belongs to the desktop, not to the page.
-                if (msg == WM_LBUTTONDOWN)
-                {
-                    Action<Point> fall = FallThrough;
-                    if (fall != null) fall(new Point(pt.X, pt.Y));
-                }
-                return true;
-            }
+            // v0.2.2: the window region already decided that this point belongs to the page, so
+            // everything arriving here is forwarded — no software hit test, no synthetic replay.
+            if (msg == WM_MOUSEMOVE) HealDragState();
+            if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN) BeginDrag();
+            bool up = msg == WM_LBUTTONUP || msg == WM_RBUTTONUP;
             IntPtr targetHandle = target();
-            if (targetHandle == IntPtr.Zero) return false;
-            if (msg == WM_MOUSEWHEEL)
+            if (targetHandle != IntPtr.Zero)
             {
-                // Forward verbatim: the page's input window expects the cursor position in screen
-                // coordinates and the wheel delta in HIWORD(wParam), exactly as Windows wrote them.
-                SendMessage(targetHandle, (uint)msg, m.WParam, m.LParam);
-                return true;
+                if (msg == WM_MOUSEWHEEL)
+                {
+                    // Forward verbatim: the page's input window expects the cursor position in screen
+                    // coordinates and the wheel delta in HIWORD(wParam), exactly as Windows wrote them.
+                    SendMessage(targetHandle, (uint)msg, m.WParam, m.LParam);
+                }
+                else
+                {
+                    ScreenToClient(targetHandle, ref pt);
+                    SendMessage(targetHandle, (uint)msg, m.WParam, MakeLParam(pt.X, pt.Y));
+                }
             }
-            ScreenToClient(targetHandle, ref pt);
-            SendMessage(targetHandle, (uint)msg, m.WParam, MakeLParam(pt.X, pt.Y));
+            if (up) EndDrag();
             return true;
+        }
+
+        /// <summary>First button down: keep the whole window until every button is back up.</summary>
+        private void BeginDrag()
+        {
+            if (buttonsDown < 0) buttonsDown = 0;
+            buttonsDown++;
+            if (dragActive) return;
+            dragActive = true;
+            Action<bool> changed = DragStateChanged;
+            if (changed != null) changed(true);
+        }
+
+        private void EndDrag()
+        {
+            if (buttonsDown > 0) buttonsDown--;
+            if (!dragActive || buttonsDown > 0) return;
+            dragActive = false;
+            Action<bool> changed = DragStateChanged;
+            if (changed != null) changed(false);
+        }
+
+        /// <summary>
+        /// Self-heal for a lost button-up (e.g. the WebView2 input window took mouse capture and ate
+        /// it): the next move checks the real button state and drops the drag when nothing is held,
+        /// so the catcher region can never stay expanded forever.
+        /// </summary>
+        private void HealDragState()
+        {
+            if (!dragActive) return;
+            bool held = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0
+                || (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+            if (held) return;
+            buttonsDown = 0;
+            dragActive = false;
+            Action<bool> changed = DragStateChanged;
+            if (changed != null) changed(false);
+        }
+
+        /// <summary>
+        /// v0.2.2: the window region IS the hit test (SPW-island's shaped input peer). rects is the
+        /// union of the page's interactive rectangles in window pixels; input outside it falls through
+        /// to the window below at OS hit-test level. null/empty = whole window (fail-open).
+        /// Ownership: the HRGN handed to SetWindowRgn is owned by the system afterwards (MSDN), so it
+        /// is never deleted here; only the temporary CombineRgn operands are.
+        /// </summary>
+        public void ApplyHitRegion(List<Rectangle> rects)
+        {
+            lastRegionRects = rects;
+            if (!IsHandleCreated) return;
+            IntPtr combined = IntPtr.Zero;
+            try
+            {
+                if (rects != null)
+                {
+                    for (int i = 0; i < rects.Count; i++)
+                    {
+                        Rectangle r = rects[i];
+                        if (r.Width <= 0 || r.Height <= 0) continue;
+                        IntPtr one = CreateRectRgn(r.Left, r.Top, r.Right, r.Bottom);
+                        if (one == IntPtr.Zero) continue;
+                        if (combined == IntPtr.Zero) { combined = one; continue; }
+                        IntPtr next = CreateRectRgn(0, 0, 0, 0);
+                        if (next != IntPtr.Zero)
+                        {
+                            CombineRgn(next, combined, one, RGN_OR);
+                            DeleteObject(combined);
+                            combined = next;
+                        }
+                        DeleteObject(one);
+                    }
+                }
+                if (SetWindowRgn(Handle, combined, true) != 0) combined = IntPtr.Zero;
+            }
+            catch (Exception) { }
+            finally
+            {
+                if (combined != IntPtr.Zero) DeleteObject(combined);
+            }
         }
         private static IntPtr MakeLParam(int x, int y)
         {
