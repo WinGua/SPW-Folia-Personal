@@ -45,7 +45,7 @@
   var lastFps = 0;
   var sources = [];
   var settings = {};
-  var inputs = { state: null, lyrics: null, track: null, audio: null, hello: null, beat: null, ui: null };
+  var inputs = { state: null, lyrics: null, track: null, queue: null, audio: null, hello: null, beat: null, ui: null };
   var lastClockSentAt = 0;
 
   function post(msg) {
@@ -247,6 +247,12 @@
         inputs.track = msg;
         emitLocal('track', msg);
         break;
+      case 'queue':
+        // protocol §3.2 / playback-controls.md §3.2: current playback queue snapshot; the settings
+        // PlaybackBar + queue panel subscribe to 'queue' and read inputs.queue on late mount.
+        inputs.queue = msg;
+        emitLocal('queue', msg);
+        break;
       case 'audio':
         inputs.audio = msg;
         deliver('audio', toAudio(msg));
@@ -290,6 +296,7 @@
       else if (type === 'settingsUI') post({ type: 'settingsUI', state: (payload && payload.state) || 'open' });
       else if (type === 'action') post({ type: 'action', name: (payload && payload.name) || payload });
       else if (type === 'log') post({ type: 'log', level: (payload && payload.level) || 'info', msg: (payload && payload.msg) || '' });
+      else if (type === 'control') post(Object.assign({ type: 'control' }, payload || {}));
       else post({ type: type, payload: payload });
       emitLocal(type, payload);
     },
@@ -338,6 +345,23 @@
       emitLocal('ui', { action: 'toggle-settings' });
       e.preventDefault();
     }
+  }, true);
+
+  // Mouse side-button "back" (XBUTTON1 → DOM button 3) exits Folia mode. Mirrors ESC ownership:
+  // while the settings overlay is open the first back closes the overlay only; otherwise the host
+  // receives the same `action: close` envelope the ESC path uses and closes the window
+  // (reason "user"). mousedown only: Chromium fires mouseup/auxclick for the same press, and a
+  // second dispatch would otherwise turn "close settings" into "exit".
+  document.addEventListener('mousedown', function (e) {
+    if (!e || e.button !== 3) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (isSettingsOpen()) {
+      applyUiAction('close-settings');
+      emitLocal('ui', { action: 'close-settings' });
+      return;
+    }
+    post({ type: 'action', name: 'close' });
   }, true);
 
   // ---------------------------------------------------------------- rAF metrics

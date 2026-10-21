@@ -7,12 +7,12 @@ import {
     bridgeIsInjected,
     bridgeTrackCover,
     DEMO_TRACK,
-    DEMO_THEME,
     type BridgeTrackMessage,
 } from '~/bridge';
 import { snapshotFromState, useSettingsStore } from '~/model/settings';
+import { onSystemSchemeChange, systemPrefersLight } from '~/model/theme';
 import { ConfigPublisher, type PublisherLyricLine, type PublisherTrack } from '~/publisher/config';
-import { deriveThemeFromCover } from '~/publisher/deriveTheme';
+import { sampleCover, themeFromSample, type CoverSample } from '~/publisher/deriveTheme';
 import { applyThemeFonts } from '~/publisher/themeFonts';
 import type { Theme } from '@/types';
 
@@ -80,9 +80,9 @@ export const getLastPublishedSubtitleTheme = (): Theme | null => lastPublishedSu
 export const useConfigPublisher = (): void => {
     useEffect(() => {
         const bridge = getBridge();
-        // The cover-derived base theme; the 字体 settings are applied on top of it (v0.1.3).
-        let coverTheme: Theme = DEMO_THEME;
-        let isDaylight = false;
+        // The last cover sample (v0.3.0): the base theme is rebuilt synchronously from it, with the
+        // 字体 settings applied on top (v0.1.3) and the effective lightness chosen per mode.
+        let coverSample: CoverSample | null = null;
         let lyrics: PublisherLyricLine[] = toPublisherLyrics(bridge.inputs?.lyrics);
         let track = toPublisherTrack(bridge.inputs?.track, lyrics);
         // The raw track message, kept so a lyrics event can re-apply it without inventing a track.
@@ -94,16 +94,24 @@ export const useConfigPublisher = (): void => {
         /** settings + theme + subtitleTheme, with the persisted 字体/字幕字体 selections applied. */
         const themedInputs = () => {
             const state = useSettingsStore.getState();
-            const theme = applyThemeFonts(coverTheme, state.appearance);
+            // v0.3.0: while the player window is transparent the text colours follow the system
+            // colour scheme (dark system → light text), not the cover's darkness. The cover still
+            // supplies the hue; the non-transparent window keeps the cover-driven palette.
+            const derived = themeFromSample(
+                coverSample,
+                track?.title,
+                state.transparentPlayerBackground ? systemPrefersLight() : undefined,
+            );
+            const theme = applyThemeFonts(derived.theme, state.appearance);
             const subtitleTheme = state.subtitle.subtitleFontInheritsLyrics
                 ? theme
-                : applyThemeFonts(coverTheme, {
+                : applyThemeFonts(derived.theme, {
                     fontStyle: state.subtitle.subtitleFontStyle,
                     fontWeight: state.subtitle.subtitleFontWeight,
                 });
             lastPublishedTheme = theme;
             lastPublishedSubtitleTheme = subtitleTheme;
-            return { settings: snapshotFromState(state), theme, subtitleTheme };
+            return { settings: snapshotFromState(state), theme, subtitleTheme, isDaylight: derived.isDaylight };
         };
 
         const publisher = new ConfigPublisher({ pushConfig: config => bridge.pushConfig(config) }, {
@@ -111,8 +119,20 @@ export const useConfigPublisher = (): void => {
             track,
             lyricOffsetMs: bridge.inputs?.state?.lyricOffsetMs ?? 0,
             playerState: bridge.inputs?.state?.playerState ?? 'IDLE',
-            isDaylight,
         });
+
+        /** Publishes the effective inputs and mirrors the effective lightness into the store, where
+         *  the transparent-window guards (and their auto-close fallback) consume it. */
+        const sync = () => {
+            let inputs = themedInputs();
+            const store = useSettingsStore.getState();
+            if (store.isDaylightTheme !== inputs.isDaylight) {
+                store.setIsDaylightTheme(inputs.isDaylight);
+                // The mirror can flip transparency back off (lumiere on a light scheme); recompute.
+                inputs = themedInputs();
+            }
+            publisher.update(inputs);
+        };
 
         const refreshTheme = async () => {
             const cover = track?.coverUrl ?? null;
@@ -121,14 +141,13 @@ export const useConfigPublisher = (): void => {
             // previous palette instead of flashing the dark fallback, then derive once the cover
             // data URL actually arrives.
             if (!cover) return;
-            const result = await deriveThemeFromCover(cover, track?.title);
+            const sample = await sampleCover(cover);
             if (disposed || token !== themeToken) return;
-            coverTheme = result.theme;
-            isDaylight = result.isDaylight;
+            coverSample = sample;
             // v0.2.0: the transparent-window compatibility of `lumiere` depends on the theme being
-            // light or dark, so the store mirrors the derived flag for the panel/switch logic.
-            useSettingsStore.getState().setIsDaylightTheme(result.isDaylight);
-            publisher.update({ ...themedInputs(), isDaylight });
+            // light or dark (v0.3.0: cover-derived when opaque, system-derived while transparent),
+            // so the store mirrors the effective flag for the panel/switch logic.
+            sync();
         };
 
         const applyTrack = (nextTrack: BridgeTrackMessage | null | undefined, nextLyrics: PublisherLyricLine[] | null) => {
@@ -139,7 +158,7 @@ export const useConfigPublisher = (): void => {
         };
 
         const unsubscribeStore = useSettingsStore.subscribe(() => {
-            publisher.update(themedInputs());
+            sync();
         });
 
         const offTrack = bridgeOn<BridgeTrackMessage>('track', payload => {
@@ -152,6 +171,8 @@ export const useConfigPublisher = (): void => {
         });
         const offSettings = bridgeOn('settings', () => publisher.invalidate());
         const offConfig = bridgeOn('hello', () => publisher.invalidate());
+        // v0.3.0: a system dark/light flip while the window is transparent re-tints the text.
+        const offScheme = onSystemSchemeChange(() => sync());
 
         void refreshTheme();
         publisher.update({ ...themedInputs(), track, lyricOffsetMs: bridge.inputs?.state?.lyricOffsetMs ?? 0 });
@@ -166,6 +187,7 @@ export const useConfigPublisher = (): void => {
             offLyrics();
             offSettings();
             offConfig();
+            offScheme();
             publisher.dispose();
         };
     }, []);

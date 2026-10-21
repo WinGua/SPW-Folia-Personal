@@ -1,4 +1,4 @@
-# spw-folia 集成协议 v1（冻结草案，2026-10-18）
+# spw-folia 集成协议 v1（冻结草案，2026-10-18；v0.3.0 增补播放控制通道，向后兼容）
 
 > 本文件是 **插件(Kotlin) ↔ 宿主进程(C#) ↔ WebView2 页面(JS)** 的接口契约。
 > 任何一方改动字段必须先改本文件并通知 Lead。设计目标：页面内计算 `config`，宿主只做搬运；无 HTTP 服务、无网络依赖。
@@ -27,6 +27,7 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 | `state` | `posMs:int`, `durationMs:int`, `playing:bool`, `rate:number`, `tsMs:int64` | 播放时钟，建议 100ms 一次（≥20Hz）。页面按 `tsMs + (now-tsMs)*rate` 插值 |
 | `lyrics` | `lines:[{startMs,endMs,main,sub,cells:[{startMs,endMs,text}]}]`, `offsetMs:int`, `translationMode?` | 曲目/歌词变化时发送；空数组=无歌词 |
 | `track` | `id`, `title`, `artist`, `album`, `durationMs`, `coverDataUrl?`, `coverPath?` | 封面优先 data URL（JPEG/PNG base64），否则宿主负责本地读取。宿主转发页面时同时给出 `coverUrl` 镜像（v0.1.2+，见 §1.1） |
+| `queue` | `mode:"circle"|"circle-end"|"repeat-one"|"random"`, `random:bool`, `index:int`, `items:[{id,title,artist,album}]` | v0.3.0+：当前播放队列快照。`random=true` 时 `items` 为随机队列且 `index` 对应随机队列位置，否则为顺序队列。首次连接后、播放队列/模式变化时发送（低频，无变化不重发）；播放进度不在此处 |
 | `config` | `config: object` | 可选覆盖：插件强制推送完整 Folia `ObsBrowserSourceConfig`（调试/兼容用，正常不用） |
 | `audioMode` | `mode:"loopback"|"host-fft"|"off"` | 可选；默认 loopback |
 | `quit` | — | 请求优雅退出 |
@@ -45,6 +46,7 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 | `closed` | `reason:"user"|"error"|"plugin"` | 窗口关闭（ESC/Alt+F4/崩溃）；随后进程退出。**插件必须据此清理状态，再点菜单可重新启动** |
 | `settings` | `settings: object` | UI 修改了设置 → 插件持久化（并可选校验/夹紧） |
 | `action` | `name:"reset"|"openDevTools"|"reload"` | UI 请求的动作 |
+| `control` | `action:"toggle"|"previous"|"next"|"seek"|"shuffle"|"queue-play"`, `positionMs?`, `index?`, `random?` | v0.3.0+：播放条控制请求（由 §3.1 的页面 `control` 消息转发）。插件经宿主内部播放器接口执行，见 §3.4 |
 | `log` | `level:"info"|"warn"|"error"`, `msg` | 诊断日志（插件写入 logs.txt） |
 
 ## 3. 宿主 ↔ 页面
@@ -53,6 +55,9 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 - `{"type":"ready"}`：页面/注入脚本就绪（dist 的 `__spwFoliaReady` 与设置 UI 分别报，宿主转发给插件仅作诊断）
 - `{"type":"settings","settings":{...}}`：设置 UI 改动（宿主立即转发给插件持久化）
 - `{"type":"action","name":"close"|"reset"|"openDevTools"}`
+- `{"type":"control","action":"toggle"|"previous"|"next"|"seek"|"shuffle"|"queue-play","positionMs"?,"index"?,"random"?}`（v0.3.0+）：
+  播放条控制。宿主原样转发为 §2 `control`，不自行处理。页面侧通过
+  `__SPW_FOLIA__.emit('control', {action, ...})` 发出（Shim 平铺字段，见 §3.4）。
 - `{"type":"log","level":"...","msg":"..."}`
 - `{"type":"beatDebug",...}`：可选
 - `{"type":"ui","settingsOpen":true|false}`：设置覆盖层开合状态（Shim 在捕获阶段拦截 `settingsUI` 特殊消息后发出；宿主据此在覆盖层打开期间强制显示光标，并保证 ESC 优先关闭覆盖层）
@@ -65,6 +70,7 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 | `state` | `{posMs,durationMs,playing,rate,tsMs,lyricOffsetMs?}` | 转成 `clock` 事件：`{currentTime:posMs/1000, duration:durationMs/1000, playerState:playing?'playing':'paused', sentAtMs:Date.now(), playbackRate:rate, lyricOffsetMs:offsetMs/1000}`（EventSource 分发，250ms 或变化时发；时间插值在页面侧做） |
 | `lyrics` | `{lines,offsetMs}` | 更新设置 UI 的歌词输入 + 重算 config |
 | `track` | `{...}` | 更新配置（theme/cover/title） |
+| `queue` | `{mode,random,index,items:[{id,title,artist,album}]}` | v0.3.0+：记入 `inputs.queue` 并 `emit('queue')`，设置 UI 播放列表据此渲染 |
 | `audio` | `{power,bass,lowMid,mid,vocal,treble,spectrum:[...]}` | 转成 `audio` 事件，**已是 0..255 gamma 尺度**；spectrum 为 0..255 数组（1024 bins） |
 | `config` | `{config}` | 直接分发 `config` 事件（覆盖页面自算，调试用） |
 | `beat` | `{beatImpact,downbeatImpact}` | 可选：若 beat-FX 注入可用，Shim 负责 `.set()` 模块 MV |
@@ -73,14 +79,32 @@ SPW (JVM) ── spawn ──> spw-folia-host.exe (C#/.NET, 全屏窗口 + WebVi
 ```ts
 window.__SPW_FOLIA__ = {
   protocol: 1,
-  on(type: 'hello'|'settings'|'state'|'lyrics'|'track'|'audio'|'config', fn),
-  emit(type, payload),                  // 设置 UI → KHost（内部转 chrome.webview.postMessage）
+  on(type: 'hello'|'settings'|'state'|'lyrics'|'track'|'audio'|'config'|'queue', fn),
+  emit(type, payload),                  // 设置 UI → KHost（内部转 chrome.webview.postMessage；type:'control' 平铺为 §3.1 control 消息）
   pushConfig(config),                   // 设置 UI → 页面: 立即作为 config 事件分发
   getSettings(), setSettings(partial),  // 内存 + 持久化（emit({type:'settings'}))
   requestClose(),
   inputs: { state, lyrics, track }      // 只读快照
 }
 ```
+
+### 3.4 播放控制通道（v0.3.0+）
+
+播放条（设置 UI 注入的底部 HUD）通过 §3.1 `control` 消息驱动真实播放器；宿主只做搬运，插件落到
+SPW 宿主进程内的播放器接口（见 `docs/playback-controls.md` 的反射映射）。
+
+| action | 字段 | 语义 |
+|---|---|---|
+| `toggle` | — | 播放/暂停切换 |
+| `previous` | — | 上一首 |
+| `next` | — | 下一首 |
+| `seek` | `positionMs:int` | 跳转到指定毫秒（夹紧到 `[0,durationMs]`） |
+| `shuffle` | — | 切换随机播放：开→记住当前非随机模式并切到 Random；关→恢复记住的模式（默认 circle） |
+| `queue-play` | `index:int`, `random:bool` | 播放列表中第 `index` 项；`random` 与 `queue` 事件的 `random` 字段一致，插件据此选择随机/顺序队列 |
+
+状态回流：`queue` 事件携带 `mode`（`circle|circle-end|repeat-one|random`）、`random`、`index` 与 `items`；
+页面以 `mode === 'random'` 作为随机按钮激活态，以 `index` 高亮当前项。点击列表项后页面立即发
+`queue-play`，不必等待 `queue` 回流。`queue` 事件与高频 `state` 通道独立，不要求 20Hz。
 
 ## 4. 设置对象（settings）与 config 构建
 - `settings` 是设置 UI 的状态树（JSON），字段见 `docs/folia-spec/settings-ui.md` §4；键名**沿用 Folia 存储键**（styleId、smartBeat…），便于对照。
@@ -120,6 +144,10 @@ window.__SPW_FOLIA__ = {
 - 宿主首次打开且无持久化设置时带 `--open-settings`（可在 hello 后发 `command open-settings`），
   之后直接显示视觉器；菜单再次点击时窗口已存在则置前（不重复开窗）。
 - 宿主收到 `command close-settings` 时调用 `__SPW_FOLIA__.ui.closeSettings()`；`open-settings` 相反。
+- 鼠标侧键「返回」（XBUTTON1，DOM `button===3`）与 ESC 同义（v0.3.0 起）：Shim 在 window capture
+  阶段处理 `mousedown`，overlay 打开时只关 overlay，否则发 `{"type":"action","name":"close"}` 让宿主
+  关窗（`reason=user`）。透明模式下由宿主 `TransparencyInputCatcher` 转发 `WM_XBUTTONDOWN/UP`；
+  侧键「前进」（XBUTTON2）不退出。
 - 视觉器页面本身保持 OBS 模式（`isPlayerChromeHidden:true`），不注入任何 Folia 播放器 chrome。
 - 光标策略（v0.1.1 起）：全屏窗口内鼠标静止 2.5 s 后隐藏光标，移动即恢复；设置覆盖层打开期间强制显示；
   关闭窗口后恢复系统光标。宿主把「`settingsOpen` OR 未空闲」作为目标可见性（幂等、状态变化时才写日志）。

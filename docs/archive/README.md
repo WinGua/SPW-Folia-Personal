@@ -11,9 +11,9 @@ and [`docs/release.md`](../release.md) keeps a compact artifact ledger.
 
 ## Contents
 
-- `release-notes-v*.md` (12) — the release bodies for v0.1.0 … v0.2.1 (v0.1.5 and v0.1.11 never got
+- `release-notes-v*.md` (14) — the release bodies for v0.1.0 … v0.3.0 (v0.1.5 and v0.1.11 never got
   one; v0.1.8's notes describe a build that was never published). Superseded by the Releases page.
-- `verification-v*.md` (11) — per-version end-to-end verification reports (style sweeps, offline and
+- `verification-v*.md` (13) — per-version end-to-end verification reports (style sweeps, offline and
   packaging assertions, crash repros), including the unpublished v0.1.5 and v0.1.11 local builds. Read
   one when you need the evidence behind a specific fix.
 - `verification-live-preview.md` — the task-14 report behind the live settings preview.

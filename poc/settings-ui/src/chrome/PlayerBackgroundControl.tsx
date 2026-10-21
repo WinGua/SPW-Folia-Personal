@@ -22,12 +22,10 @@ interface PlayerBackgroundControlProps {
     enabled: boolean;
     onToggle: (next: boolean) => void;
     label: string;
-    hint: string;
     /** v0.1.9: while transparent, let the mouse reach the desktop instead of the page. */
     passthrough: boolean;
     onTogglePassthrough: (next: boolean) => void;
     passthroughLabel: string;
-    passthroughHint: string;
     /** v0.2.0: how the selected style behaves under the transparent window. */
     compat: TransparencyCompat;
     /** v0.2.0: extra line under the switches (why the switch is off / what is simplified). */
@@ -41,11 +39,9 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
     enabled,
     onToggle,
     label,
-    hint,
     passthrough,
     onTogglePassthrough,
     passthroughLabel,
-    passthroughHint,
     compat,
     compatNote,
 }) => {
@@ -94,7 +90,6 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
                 >
                     <span className="spw-player-bg-text">
                         <span className="spw-player-bg-label">{label}</span>
-                        <span className="spw-player-bg-hint">{hint}</span>
                     </span>
                     <span className="spw-switch" data-on={enabled ? 'true' : 'false'} aria-hidden="true">
                         <span className="spw-switch-knob" />
@@ -110,19 +105,11 @@ const PlayerBackgroundControl: React.FC<PlayerBackgroundControlProps> = ({
                     >
                         <span className="spw-player-bg-text">
                             <span className="spw-player-bg-label">{passthroughLabel}</span>
-                            <span className="spw-player-bg-hint">{passthroughHint}</span>
                         </span>
                         <span className="spw-switch" data-on={passthrough ? 'true' : 'false'} aria-hidden="true">
                             <span className="spw-switch-knob" />
                         </span>
                     </button>
-                ) : null}
-                {enabled ? (
-                    <p className="spw-player-bg-note">
-                        {passthrough
-                            ? '鼠标正落向桌面：右下角圆钮与右上角齿轮始终可点；关掉「鼠标穿透」即可操作页面。'
-                            : '透明窗口内页面可正常点击；打开「鼠标穿透」可直接操作桌面。ESC 退出播放。'}
-                    </p>
                 ) : null}
                 {compatNote ? <p className="spw-player-bg-note spw-player-bg-note--compat">{compatNote}</p> : null}
             </div>

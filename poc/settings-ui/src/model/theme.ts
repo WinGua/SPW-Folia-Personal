@@ -5,6 +5,26 @@ import { colorWithAlpha } from '@/components/visualizer/colorMix';
 
 export const IS_DAYLIGHT = false;
 
+/* v0.3.0: while the player window is transparent, the text colours follow the *system* colour
+ * scheme (Windows dark/light mode), not the cover's darkness. The host injects no theme value of
+ * its own (poc/webview only knows Folia's `"colorScheme": "default"`), so the page asks Chromium's
+ * `prefers-color-scheme`, which WebView2 keeps in step with the Windows app mode. */
+
+/** True when the system colour scheme is light (dark when matchMedia is unavailable). */
+export const systemPrefersLight = (): boolean =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? !window.matchMedia('(prefers-color-scheme: dark)').matches
+        : false;
+
+/** Subscribes to system colour scheme flips; returns the unsubscribe function. */
+export const onSystemSchemeChange = (listener: (isLight: boolean) => void): (() => void) => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const notify = () => listener(!query.matches);
+    query.addEventListener('change', notify);
+    return () => query.removeEventListener('change', notify);
+};
+
 /** The preview song's theme (Folia draws the sample stage on the theme background colour). */
 export const PREVIEW_THEME: Theme = {
     name: 'Midnight Default',

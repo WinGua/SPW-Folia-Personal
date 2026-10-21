@@ -90,6 +90,8 @@ class FoliaPlugin(
         }
         bridge.lyricsProvider = { FoliaPlaybackExtension.get()?.lyricsJson() }
         bridge.trackProvider = { FoliaPlaybackExtension.get()?.trackJson() }
+        // v0.3.0 playback bar: queue snapshot + controls (reflection over the host player).
+        bridge.queueProvider = { FoliaPlaybackControls.queueJson() }
         bridge.onSettingsFromPage = { tree ->
             settingsTree = tree
             settingsStore.persist(tree)
@@ -346,7 +348,7 @@ class FoliaPlugin(
 
     companion object {
         const val SPW_VERSION = "1.19.0"
-        const val PLUGIN_VERSION = "0.2.1"
+        const val PLUGIN_VERSION = "0.3.0"
 
         /** How long the start-up watcher waits for PF4J to instantiate the playback extension. */
         private const val EXTENSION_WATCH_MS = 20_000L

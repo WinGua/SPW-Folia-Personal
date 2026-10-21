@@ -2,7 +2,7 @@
 
 Status: **complete** (task-8). `packaging/` holds the exact payload of the final `.spmod`; the
 assembly script, checksums, size budget and a scripted packaged-layout acceptance test are included.
-Last verified: 2026-10-21 (v0.2.2 release artifact; host `spw-folia-host.exe` 131,584 B, WebView2 150.0.4078.83).
+Last verified: 2026-10-21 (v0.3.0 release artifact; host `spw-folia-host.exe` 134,144 B, WebView2 150.0.4078.83).
 
 ## 1. What ships
 
@@ -16,7 +16,7 @@ packaging/
     settings/thumbs/*.jpg      #    14 real Folia style thumbnails
     _host/shim.js, overlay.js  #    audit copies of the scripts embedded in the exe
   native/                      # -> .spmod/native/ (plugin resolveHelper also accepts lib/)
-    spw-folia-host.exe         #    C# .NET Framework 4.8 helper (130,560 B as of v0.2.0)
+    spw-folia-host.exe         #    C# .NET Framework 4.8 helper (134,144 B as of v0.3.0)
     spw-folia-host.exe.config  #    PerMonitorV2 DPI + supportedRuntime v4.8
     Microsoft.Web.WebView2.Core.dll
     Microsoft.Web.WebView2.WinForms.dll
@@ -41,10 +41,10 @@ Current sizes (`packaging/size-report.json`, `bash packaging/build-package.sh` o
 
 | area | files | size |
 | --- | --- | --- |
-| `web/` (complete Folia dist + settings island + 2 host-script copies) | 1,898 | 22.35 MB |
-| `native/` (exe 130,560 B + config + 3 dlls) | 5 | 1.01 MB |
+| `web/` (complete Folia dist + settings island + 2 host-script copies) | 1,898 | 22.37 MB |
+| `native/` (exe 134,144 B + config + 3 dlls) | 5 | 1.02 MB |
 | `licenses/` | 7 | 0.05 MB |
-| **total** | **1,910** | **23.41 MB** (budget 25 MB: OK) |
+| **total** | **1,910** | **24.57 MB** (budget 25 MB: OK) |
 
 The shipped web tree is the **complete** Folia production dist (every lazy chunk included), because
 Folia dynamic-imports per-style renderers on demand (`assets/VisualizerTempera-*.js`, …). An earlier
@@ -117,7 +117,7 @@ Scripted assembly (Lead-owned, `docs/protocol.md` order-independent):
 ```bash
 cd spw-folia && ./gradlew.bat plugin        # 1. plugin classes/ (+ lib/ if any runtime deps)
 cd .. && bash packaging/build-package.sh     # 2. re-stage web/native/licenses + checksums
-python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.1.spmod --staging packaging --out dist/release --name spw-folia-0.2.1.spmod  # 3. merge into dist/release
+python packaging/tools/assemble-release.py --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.3.0.spmod --staging packaging --out dist/release --name spw-folia-0.3.0.spmod  # 3. merge into dist/release
 node packaging/tools/verify-layout.mjs       # 4. packaged-layout acceptance on a clean unpack
 ```
 
@@ -276,19 +276,21 @@ every `.spmod`).
 | v0.1.10 | 13,145,163 | 1,941 | `4a90d09e95ea37449882f6b7507fcfa3d0ccdf72d86dbc969b26d6426cbcf951` | 2026-10-19 |
 | v0.2.0 | 13,149,053 | 1,941 | `d3bc76163dc1fa5598455b48e5fc4674b5a6f588cca5e84fa9951a72160c2fbb` | 2026-10-20 |
 | v0.2.1 | 13,152,604 | 1,941 | `56c0aa4177a1bea8fe0078a9c27ab2dee264f0c85387af0a667086cd39f0e792` | 2026-10-20 |
-| **v0.2.2** | **13,153,013** | **1,941** | `ca74c7fc4b6ce807af582f8dcbae041f4001bbf8b291e86e3be29a30f9fa38ac` | 2026-10-21 |
+| v0.2.2 | 13,153,013 | 1,941 | `ca74c7fc4b6ce807af582f8dcbae041f4001bbf8b291e86e3be29a30f9fa38ac` | 2026-10-21 |
+| **v0.3.0** | **13,178,430** | **1,943** | `7f79d9dc8184c1119ce42a6dc59e1036fb3ffee6bb883c0c603cfdd977d80744` | 2026-10-21 |
 
 `local only` builds were verified on a real install but never uploaded; their changes shipped inside
 the next published release. v0.1.11 was never built as a standalone artifact either — its two fixes
 (see [`archive/verification-v0.1.11.md`](archive/verification-v0.1.11.md)) went out with v0.2.0.
 
-Current release payload (v0.2.2): plugin classes 94,303 B (`4893ce14…`), native host 131,584 B
-(`e4248044…`, reworked input path — shaped-region hit testing), settings island 1,071,968 B
-(`eeb8a128…`, unchanged since v0.2.0), complete Folia 0.7.21 OBS bundle + licenses. Staged payload:
-1,910 files / 23.41 MB (web 1,898 / 22.35 MB, native 5 / 1.01 MB, licenses 7 / 0.05 MB) against a
-25 MB budget. Verify a downloaded artifact with:
+Current release payload (v0.3.0): plugin classes 112,411 B (`18e89d9e…`, the Gradle-built
+`classes/` + metadata zip; 238,514 B uncompressed), native host 134,144 B (`536037d5…`, new
+control→stdin / queue→page relay and X-button forwarding), settings island 1,093,739 B
+(`62609003…`, playback controls / acrylic HUD / transparency fixes), complete Folia 0.7.21 OBS
+bundle + licenses. Staged payload: 1,910 files / 24.57 MB (web 1,898 / 22.37 MB, native 5 /
+1.02 MB, licenses 7 / 0.05 MB) against a 25 MB budget. Verify a downloaded artifact with:
 
 ```bash
-sha256sum spw-folia-0.2.2.spmod    # compare with the ledger row and the release's SHA256SUMS.txt
+sha256sum spw-folia-0.3.0.spmod    # compare with the ledger row and the release's SHA256SUMS.txt
 node packaging/tools/verify-layout.mjs   # packaged-layout acceptance on a clean unpack
 ```

@@ -5,7 +5,7 @@ import type { ObsBrowserSourceConfig } from '@/types/obsBrowserSource';
 import type { Theme } from '@/types';
 import { useSettingsStore, snapshotFromState, applySnapshot, type SettingsSnapshot } from '~/model/settings';
 
-export type BridgeEventType = 'hello' | 'settings' | 'state' | 'lyrics' | 'track' | 'audio' | 'config' | 'beat' | 'settingsUI';
+export type BridgeEventType = 'hello' | 'settings' | 'state' | 'lyrics' | 'track' | 'audio' | 'config' | 'beat' | 'settingsUI' | 'queue';
 
 export interface BridgeStateMessage {
     currentTime: number;
@@ -29,6 +29,39 @@ export interface BridgeTrackMessage {
     lyrics?: unknown;
 }
 
+/* v0.3.0: playback control channel (docs/protocol.md §3.1 `control` / §3.4). The page only asks;
+ * the plugin is the control sink, the host just relays. */
+export type PlaybackControlAction = 'toggle' | 'previous' | 'next' | 'seek' | 'shuffle' | 'queue-play';
+
+export interface PlaybackControlExtra {
+    /** `seek` target in milliseconds (clamped by the plugin). */
+    positionMs?: number;
+    /** `queue-play` row index. */
+    index?: number;
+    /** `queue-play`: play the random queue instead of the normal one. */
+    random?: boolean;
+}
+
+export interface PlaybackControlPayload extends PlaybackControlExtra {
+    action: PlaybackControlAction;
+}
+
+/** One row of the current playback queue (protocol §3.2 `queue`). */
+export interface QueueItem {
+    id: string;
+    title: string;
+    artist: string;
+    album?: string;
+}
+
+/** Current queue snapshot: `random` selects the random queue and `index` points into `items`. */
+export interface PlaybackQueueSnapshot {
+    mode: 'circle' | 'circle-end' | 'repeat-one' | 'random';
+    random: boolean;
+    index: number;
+    items: QueueItem[];
+}
+
 /** The cover can arrive as `coverUrl` (page/config naming) or `coverDataUrl` (plugin naming). */
 export const bridgeTrackCover = (track: BridgeTrackMessage | null | undefined): string | null => {
     if (!track) return null;
@@ -44,7 +77,13 @@ export interface SpwFoliaBridge {
     getSettings: () => unknown;
     setSettings: (partial: unknown) => void;
     requestClose?: () => void;
-    inputs?: { state?: BridgeStateMessage | null; lyrics?: unknown; track?: BridgeTrackMessage | null };
+    inputs?: {
+        state?: BridgeStateMessage | null;
+        lyrics?: unknown;
+        track?: BridgeTrackMessage | null;
+        /** v0.3.0: last `queue` snapshot the host sent; may be absent on older shims. */
+        queue?: PlaybackQueueSnapshot | null;
+    };
     /** protocol §7.5: overlay-only settings control surface the host drives (no page reload). */
     ui?: SettingsUiApi;
 }
@@ -67,6 +106,8 @@ declare global {
         __SPW_FOLIA__?: SpwFoliaBridge;
         __SPW_FOLIA_UI__?: SettingsUiController;
         __SPW_FOLIA_LAST_CONFIG__?: ObsBrowserSourceConfig;
+        /** v0.3.0 dev-only: every `control` the page emitted, in order (fake bridge + verify scripts). */
+        __SPW_FOLIA_TEST_CONTROLS__?: PlaybackControlPayload[];
     }
 }
 
@@ -111,29 +152,192 @@ const DEMO_THEME: Theme = {
 
 const isInjected = (): boolean => typeof window.__SPW_FOLIA__ === 'object' && window.__SPW_FOLIA__ !== null;
 
-/** Fake bridge for running the bundle in a plain browser (`pnpm dev` → dev.html). */
-const createFakeBridge = (): SpwFoliaBridge => ({
-    protocol: 1,
-    on: (type, listener) => {
-        const set = listeners.get(type) ?? new Set();
-        set.add(listener as (payload: unknown) => void);
-        listeners.set(type, set);
-        return () => set.delete(listener as (payload: unknown) => void);
-    },
-    emit: (type, payload) => emitLocally(type, payload),
-    pushConfig: config => {
-        window.__SPW_FOLIA_LAST_CONFIG__ = config;
-        console.info('[settings-ui] pushConfig', config);
-    },
-    getSettings: () => null,
-    setSettings: partial => {
-        console.info('[settings-ui] setSettings', partial);
-    },
-    requestClose: () => console.info('[settings-ui] requestClose'),
-    inputs: { state: null, lyrics: null, track: DEMO_TRACK },
+let bridgeInstance: SpwFoliaBridge | null = null;
+
+/* v0.3.0 · fake bridge playback model (dev.html only). It mirrors what the plugin/host send back:
+ * a queue snapshot plus state/track events, so the playback HUD and the queue panel have real
+ * feedback while clicking around without a host. */
+const DEMO_QUEUE: QueueItem[] = [
+    { id: DEMO_TRACK.id, title: DEMO_TRACK.title, artist: DEMO_TRACK.artist ?? 'Folia', album: DEMO_TRACK.album ?? undefined },
+    { id: 'demo-02', title: '夜航星', artist: '不才', album: '夜航星' },
+    { id: 'demo-03', title: '星间旅行 Interstellar Journey', artist: '知更鸟, HOYO-MiX' },
+    { id: 'demo-04', title: 'Lemon', artist: '米津玄師', album: 'Lemon' },
+    { id: 'demo-05', title: '花に亡霊', artist: 'ヨルシカ', album: '盗作' },
+    { id: 'demo-06', title: '群青', artist: 'YOASOBI', album: 'THE BOOK' },
+    { id: 'demo-07', title: '光るなら', artist: 'Goose house' },
+];
+
+const DEMO_DURATION_MS = 245_000;
+
+interface FakePlaybackModel {
+    index: number;
+    playing: boolean;
+    /** position at `atMs`; the clock is extrapolated lazily so no interval churns dev renders */
+    positionMs: number;
+    atMs: number;
+    durationMs: number;
+    mode: PlaybackQueueSnapshot['mode'];
+}
+
+const fakePlayback: FakePlaybackModel = {
+    index: 0,
+    playing: true,
+    positionMs: 31_000,
+    atMs: Date.now(),
+    durationMs: DEMO_DURATION_MS,
+    mode: 'circle',
+};
+
+const fakePosition = (): number => {
+    const model = fakePlayback;
+    const position = model.playing ? model.positionMs + (Date.now() - model.atMs) : model.positionMs;
+    return Math.min(Math.max(0, position), model.durationMs);
+};
+
+const fakeQueueSnapshot = (): PlaybackQueueSnapshot => ({
+    mode: fakePlayback.mode,
+    random: fakePlayback.mode === 'random',
+    index: fakePlayback.index,
+    items: DEMO_QUEUE.map(item => ({ ...item })),
 });
 
-let bridgeInstance: SpwFoliaBridge | null = null;
+const updateFakeInputs = (patch: Partial<NonNullable<SpwFoliaBridge['inputs']>>): void => {
+    if (!bridgeInstance) return;
+    bridgeInstance.inputs = { ...(bridgeInstance.inputs ?? {}), ...patch };
+};
+
+const emitFakeState = (): void => {
+    const posMs = Math.round(fakePosition());
+    updateFakeInputs({
+        state: {
+            currentTime: posMs / 1000,
+            duration: fakePlayback.durationMs / 1000,
+            playerState: fakePlayback.playing ? 'PLAYING' : 'PAUSED',
+            sentAtMs: Date.now(),
+            playbackRate: 1,
+        },
+    });
+    emitLocally('state', {
+        posMs,
+        durationMs: fakePlayback.durationMs,
+        playing: fakePlayback.playing,
+        rate: 1,
+        tsMs: Date.now(),
+    });
+};
+
+const emitFakeTrack = (): void => {
+    const item = DEMO_QUEUE[fakePlayback.index] ?? DEMO_QUEUE[0];
+    const payload: BridgeTrackMessage = {
+        id: item.id,
+        title: item.title,
+        artist: item.artist,
+        album: item.album ?? null,
+        durationMs: fakePlayback.durationMs,
+    };
+    updateFakeInputs({ track: payload });
+    emitLocally('track', payload);
+};
+
+const emitFakeQueue = (): void => {
+    const snapshot = fakeQueueSnapshot();
+    updateFakeInputs({ queue: snapshot });
+    emitLocally('queue', snapshot);
+};
+
+/** Play the semantic meaning of every control the page sends, then push the resulting snapshot. */
+const handleFakeControl = (raw: unknown): void => {
+    const payload = (raw ?? {}) as Partial<PlaybackControlPayload>;
+    const action = payload.action;
+    if (!action) return;
+    const record: PlaybackControlPayload = { action };
+    if (typeof payload.positionMs === 'number') record.positionMs = payload.positionMs;
+    if (typeof payload.index === 'number') record.index = payload.index;
+    if (typeof payload.random === 'boolean') record.random = payload.random;
+    window.__SPW_FOLIA_TEST_CONTROLS__ = window.__SPW_FOLIA_TEST_CONTROLS__ ?? [];
+    window.__SPW_FOLIA_TEST_CONTROLS__.push(record);
+
+    const model = fakePlayback;
+    switch (action) {
+        case 'toggle':
+            model.positionMs = fakePosition();
+            model.atMs = Date.now();
+            model.playing = !model.playing;
+            emitFakeState();
+            break;
+        case 'previous':
+        case 'next': {
+            const step = action === 'next' ? 1 : -1;
+            model.index = (model.index + step + DEMO_QUEUE.length) % DEMO_QUEUE.length;
+            model.positionMs = 0;
+            model.atMs = Date.now();
+            emitFakeTrack();
+            emitFakeQueue();
+            emitFakeState();
+            break;
+        }
+        case 'seek':
+            model.positionMs = Math.min(Math.max(0, record.positionMs ?? fakePosition()), model.durationMs);
+            model.atMs = Date.now();
+            emitFakeState();
+            break;
+        case 'shuffle':
+            model.mode = model.mode === 'random' ? 'circle' : 'random';
+            emitFakeQueue();
+            break;
+        case 'queue-play': {
+            const index = record.index ?? model.index;
+            if (index < 0 || index >= DEMO_QUEUE.length) return;
+            model.index = index;
+            model.positionMs = 0;
+            model.atMs = Date.now();
+            emitFakeTrack();
+            emitFakeQueue();
+            emitFakeState();
+            break;
+        }
+        default:
+            break;
+    }
+};
+
+/** Fake bridge for running the bundle in a plain browser (`pnpm dev` → dev.html). */
+const createFakeBridge = (): SpwFoliaBridge => {
+    window.__SPW_FOLIA_TEST_CONTROLS__ = window.__SPW_FOLIA_TEST_CONTROLS__ ?? [];
+    // Mirror the host replay order: state → track → queue (docs/playback-controls.md §3.1).
+    window.setTimeout(() => {
+        emitFakeTrack();
+        emitFakeQueue();
+        emitFakeState();
+    }, 0);
+    return {
+        protocol: 1,
+        on: (type, listener) => {
+            const set = listeners.get(type) ?? new Set();
+            set.add(listener as (payload: unknown) => void);
+            listeners.set(type, set);
+            return () => set.delete(listener as (payload: unknown) => void);
+        },
+        emit: (type, payload) => {
+            // v0.3.0: `control` does not echo locally — the fake bridge plays the player's part.
+            if (type === 'control') {
+                handleFakeControl(payload);
+                return;
+            }
+            emitLocally(type, payload);
+        },
+        pushConfig: config => {
+            window.__SPW_FOLIA_LAST_CONFIG__ = config;
+            console.info('[settings-ui] pushConfig', config);
+        },
+        getSettings: () => null,
+        setSettings: partial => {
+            console.info('[settings-ui] setSettings', partial);
+        },
+        requestClose: () => console.info('[settings-ui] requestClose'),
+        inputs: { state: null, lyrics: null, track: DEMO_TRACK, queue: fakeQueueSnapshot() },
+    };
+};
 
 export const getBridge = (): SpwFoliaBridge => {
     if (bridgeInstance) return bridgeInstance;
@@ -154,6 +358,12 @@ export const bridgeOn = <T,>(type: string, listener: (payload: T) => void): (() 
     const bridge = getBridge();
     const off = bridge.on(type, listener as never);
     return typeof off === 'function' ? off : () => emitLocally(`off:${type}`, null);
+};
+
+/** v0.3.0: page → player control request. The host relays it to the plugin on stdin; the page never
+ *  mutates playback state itself, it waits for the echoed `state`/`queue` snapshots. */
+export const sendPlaybackControl = (action: PlaybackControlAction, extra: PlaybackControlExtra = {}): void => {
+    getBridge().emit('control', { action, ...extra });
 };
 
 /** Settings emits are throttled to <=10 Hz (protocol §3.3) and skipped entirely when the snapshot

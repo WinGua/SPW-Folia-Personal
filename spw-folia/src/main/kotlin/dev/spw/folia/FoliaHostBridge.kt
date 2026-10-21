@@ -16,9 +16,10 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * Protocol (docs/protocol.md v1, verified against poc/webview/host/Program.cs + HostForm.cs):
  *  - plugin -> helper (stdin):  {"t":"hello"...}, {"t":"settings"...}, {"t":"state"...},
- *    {"t":"lyrics"...}, {"t":"track"...}, {"t":"quit"}
+ *    {"t":"lyrics"...}, {"t":"track"...}, {"t":"queue"...} (v0.3.0), {"t":"quit"}
  *  - helper -> plugin (stdout): {"t":"ready"...}, {"t":"closed","reason":...},
- *    {"t":"settings","settings":{...}}, {"t":"action"...}, {"t":"log"...}
+ *    {"t":"settings","settings":{...}}, {"t":"action"...}, {"t":"control"...} (v0.3.0),
+ *    {"t":"log"...}
  *
  * The helper reads stdin on a dedicated thread; EOF (plugin process death) closes it, so a
  * double safety net (quit on stop + stdin EOF) keeps no orphan processes around.
@@ -70,7 +71,16 @@ internal class FoliaHostBridge(
     @Volatile var lyricsProvider: (() -> String?)? = null
     @Volatile var trackProvider: (() -> String?)? = null
 
+    /**
+     * v0.3.0: playback queue snapshot (`{"mode":...,"random":...,"index":...,"items":[...]}`),
+     * polled every 500 ms and diffed before sending. Null when the host player is not reachable.
+     */
+    @Volatile var queueProvider: (() -> String?)? = null
+
     private val lastSentTrack = AtomicReference<String?>(null)
+
+    /** v0.3.0: last queue body sent to the helper; the pump only re-sends on change. */
+    private val lastSentQueue = AtomicReference<String?>(null)
 
     /**
      * Lyrics are tracked separately from the track (v0.1.8): SPW parses a new song's lyrics *after*
@@ -172,6 +182,7 @@ internal class FoliaHostBridge(
         lastLoggedPlaying = null
         lastSentTrack.set(null)
         lastSentLyrics.set(null)
+        lastSentQueue.set(null)
         startStdoutReader(p)
         startExitWatcher(p)
         startStdinWriter(p)
@@ -244,6 +255,26 @@ internal class FoliaHostBridge(
         // Protocol v1 keeps the track fields at the top level of the line (no nested object).
         val body = trackJson.trim().removePrefix("{").removeSuffix("}")
         sendLine("{\"t\":\"track\",$body}")
+    }
+
+    fun sendQueue(queueJson: String) {
+        lastSentQueue.set(queueJson)
+        // Same shape as `track` (protocol v1): the queue object's fields sit at the top level.
+        val body = queueJson.trim().removePrefix("{").removeSuffix("}")
+        sendLine("{\"t\":\"queue\",$body}")
+    }
+
+    /**
+     * v0.3.0: pushes the queue only when it changed (or [force]); returns true when a line went
+     * out. The provider is the reflection layer and already swallows/logs its own failures, so a
+     * transient null simply keeps the page's last snapshot.
+     */
+    private fun maybeSendQueue(force: Boolean = false): Boolean {
+        val queue = queueProvider?.invoke() ?: return false
+        if (!force && queue == lastSentQueue.get()) return false
+        log("queue -> helper (${queue.length} bytes${if (force) ", force" else ""})")
+        sendQueue(queue)
+        return true
     }
 
     private fun sendLine(line: String) {
@@ -409,6 +440,15 @@ internal class FoliaHostBridge(
                 }
             }
             "action" -> log("host action: " + (Json.stringField(line, "name") ?: "?"))
+            "control" -> {
+                // v0.3.0 playback-bar control from the page. Reflection failures are swallowed by
+                // FoliaPlaybackControls; this catch is the last line of defence for the reader thread.
+                try {
+                    FoliaPlaybackControls.handleControl(line)
+                } catch (t: Throwable) {
+                    log("control handling failed: ${t::class.java.name}: ${t.message}")
+                }
+            }
             "log" -> {
                 val level = Json.stringField(line, "level") ?: "info"
                 val msg = Json.stringField(line, "msg") ?: ""
@@ -475,6 +515,9 @@ internal class FoliaHostBridge(
             sendTrack(track)
         }
         maybeSendLyrics(force = true)
+        // v0.3.0: queue after state/track/lyrics so a re-opened window shows the list immediately.
+        runCatching { maybeSendQueue(force = true) }
+            .onFailure { log("replay queue failed: ${it::class.java.name}: ${it.message}") }
     }
 
     private fun startPump() {
@@ -509,6 +552,12 @@ internal class FoliaHostBridge(
                 // Lyrics ride the same pump but are diffed on their own: SPW delivers them a bit
                 // after the track change, and a cover load failure must not freeze them (v0.1.8).
                 maybeSendLyrics()
+                // v0.3.0 queue/mode snapshot: low-frequency diff (500 ms), force-pushed on the
+                // tick after a control so shuffle state / the highlighted item update at once.
+                val forceQueue = FoliaPlaybackControls.consumeQueueDirty()
+                if (forceQueue || pumpTicks % QUEUE_CHECK_EVERY_TICKS == 0L) {
+                    maybeSendQueue(force = forceQueue)
+                }
             } catch (t: Throwable) {
                 log("pump error: ${t::class.java.name}: ${t.message}")
             }
@@ -628,6 +677,9 @@ internal class FoliaHostBridge(
         /** Track/lyrics are polled every 200 ms (they are cheap cached JSON diffs); the provider
          *  itself throttles the Workshop API round-trip, see FoliaPlaybackExtension. */
         private const val TRACK_CHECK_EVERY_TICKS = 2L
+
+        /** v0.3.0: queue is diffed every 500 ms; controls force an immediate push via queueDirty. */
+        private const val QUEUE_CHECK_EVERY_TICKS = 5L
         private const val SETTINGS_ENTRY = "settings-ui.js"
         private const val DEV_ROOT = "D:/输出目录/dsh2"
     }

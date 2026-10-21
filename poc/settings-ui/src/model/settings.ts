@@ -24,6 +24,7 @@ import {
     type SmartBeatSettings,
 } from '@/types';
 import { getStyleTransparencyCompat } from './transparencyCompat';
+import { systemPrefersLight } from './theme';
 
 export type StyleMode =
     | 'sonnet'
@@ -192,8 +193,10 @@ interface SettingsState {
     mousePassthrough: boolean;
     setMousePassthrough: (value: boolean) => void;
 
-    /** v0.2.0: cover-derived theme lightness, mirrored from `useConfigPublisher` so the transparent
-     *  window guard can tell whether lumiere's light-theme dark field floor applies. Not persisted. */
+    /** v0.2.0: effective theme lightness, mirrored from `useConfigPublisher` so the transparent
+     *  window guard can tell whether lumiere's light-theme dark field floor applies. v0.3.0: the
+     *  cover decides while the window is opaque, the system colour scheme while it is transparent.
+     *  Not persisted. */
     isDaylightTheme: boolean;
     setIsDaylightTheme: (value: boolean) => void;
 
@@ -274,8 +277,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     setTransparentPlayerBackground: transparentPlayerBackground =>
         set(state => {
             if (!transparentPlayerBackground) return { transparentPlayerBackground, mousePassthrough: false };
+            // v0.3.0: while transparent the effective lightness is the *system* scheme, so the gate
+            // must check that value (lumiere + a light system would paint the dark-field plate).
             const blocked = getStyleTransparencyCompat(state.visualizerMode, {
-                isDaylight: state.isDaylightTheme,
+                isDaylight: systemPrefersLight(),
             }) === 'unsupported';
             return blocked
                 ? { transparentPlayerBackground: false, mousePassthrough: false }
@@ -283,9 +288,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         }),
 
     isDaylightTheme: false,
-    // v0.2.0: `lumiere` only becomes unsupported once the cover-derived theme turns out to be a
-    // light one, which is known after the config publisher derives the palette. Re-check here so a
-    // light cover cannot leave the window transparent with a 94%-opaque dark field behind it.
+    // v0.2.0: `lumiere` only becomes unsupported once the effective theme turns out to be a light
+    // one (cover-derived when opaque, system-derived while transparent since v0.3.0), which the
+    // config publisher knows before the store does. Re-check here so neither a light cover nor a
+    // light system can leave the window transparent with a 94%-opaque dark field behind it.
     setIsDaylightTheme: isDaylightTheme =>
         set(state => {
             if (!state.transparentPlayerBackground) return { isDaylightTheme };

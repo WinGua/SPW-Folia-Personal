@@ -57,6 +57,10 @@ namespace SpwFolia
         // The last lyrics/track payloads are cached so they can be replayed once navigation completes.
         private volatile string lastLyricsPayload;
         private volatile string lastTrackPayload;
+        // v0.3.0 playback controls: the last queue snapshot (protocol §1 `queue` -> §3.2 `queue`) is
+        // cached so it can be replayed after navigation completes and again when the settings UI
+        // announces bridgeReady (the injected bundle mounts later than the page navigation).
+        private volatile string lastQueuePayload;
 
         // stdin state -> clock anchor (interpolated between 100 ms state messages)
         private readonly object stateGate = new object();
@@ -961,6 +965,8 @@ namespace SpwFolia
             // allows them early; dropping them would leave the settings preview and page inputs empty).
             if (lastLyricsPayload != null) PostToPage(lastLyricsPayload);
             if (lastTrackPayload != null) PostToPage(lastTrackPayload);
+            // v0.3.0: same replay for the queue snapshot (protocol §1 allows `queue` before the page).
+            if (lastQueuePayload != null) PostToPage(lastQueuePayload);
             if (configDirty) SendConfigIfNeeded();
         }
 
@@ -998,6 +1004,9 @@ namespace SpwFolia
             {
                 // Settings-UI bundle initialized: safe to ask it to open (first-run flow, --open-settings).
                 if (args.OpenSettings && !settingsAutoOpened) OpenSettingsOnce();
+                // v0.3.0: the settings UI mounts after navigation, so replay the cached queue snapshot
+                // once more here; the PlaybackBar reads inputs.queue as its late-mount initial value.
+                if (lastQueuePayload != null) PostToPage(lastQueuePayload);
             }
             else if (type == "settingsUI" || type == "ui-state")
             {
@@ -1019,6 +1028,38 @@ namespace SpwFolia
                     settingsRaw = settingsValue;
                     ApplyTransparencyFromSettings();
                     log.WriteLine("{\"t\":\"settings\",\"settings\":" + settingsValue + "}");
+                }
+            }
+            else if (type == "control")
+            {
+                // v0.3.0 playback bar (protocol §3.1 -> §2 `control`, see docs/playback-controls.md
+                // §1/§3.2): the host only relays. Rename `type`->`t`, whitelist the action and emit the
+                // action's protocol fields; no local playback semantics live here.
+                string action = JsonUtil.GetString(msg, "action");
+                if (action == "toggle" || action == "previous" || action == "next"
+                    || action == "seek" || action == "shuffle" || action == "queue-play")
+                {
+                    StringBuilder sb = new StringBuilder(96);
+                    sb.Append("{\"t\":\"control\",\"action\":\"").Append(JsonUtil.Escape(action)).Append('"');
+                    if (action == "seek")
+                    {
+                        double positionMs = JsonUtil.GetDouble(msg, "positionMs", 0);
+                        if (positionMs < 0) positionMs = 0;
+                        sb.Append(",\"positionMs\":").Append(JsonUtil.Num(positionMs));
+                    }
+                    else if (action == "queue-play")
+                    {
+                        double index = JsonUtil.GetDouble(msg, "index", 0);
+                        if (index < 0) index = 0;
+                        sb.Append(",\"index\":").Append(JsonUtil.Num(index));
+                        sb.Append(",\"random\":").Append(JsonUtil.GetBool(msg, "random", false) ? "true" : "false");
+                    }
+                    sb.Append('}');
+                    log.WriteLine(sb.ToString());
+                }
+                else
+                {
+                    log.Log("warn", "control-drop action=" + (action ?? "?"));
                 }
             }
             else if (type == "hitbox")
@@ -1381,6 +1422,11 @@ namespace SpwFolia
                 SendTrackToPage(msg);
                 if (args.DemoConfig) PatchDemoTrack(msg);
             }
+            else if (t == "queue")
+            {
+                // v0.3.0 playback queue snapshot (protocol §1 `queue` -> §3.2 `queue`).
+                SendQueueToPage(msg, line);
+            }
             else if (t == "config")
             {
                 string configRaw = JsonUtil.ExtractRawValue(line, "config");
@@ -1564,6 +1610,28 @@ namespace SpwFolia
             sb.Append('}');
             lastTrackPayload = sb.ToString();
             PostToPage(lastTrackPayload);
+        }
+
+        // protocol §1 `queue` -> §3.2 `queue` (v0.3.0, docs/playback-controls.md §3.2). The host only
+        // relays the snapshot: `items` is copied as raw JSON (never re-serialized) and the scalar
+        // fields are normalised (mode whitelist, non-negative index). Cached for replay after
+        // navigation and on a late settings-UI bridgeReady.
+        private void SendQueueToPage(Dictionary<string, object> msg, string line)
+        {
+            string mode = JsonUtil.GetString(msg, "mode");
+            if (mode != "circle" && mode != "circle-end" && mode != "repeat-one" && mode != "random") mode = "circle";
+            string items = JsonUtil.ExtractRawValue(line, "items");
+            if (string.IsNullOrEmpty(items) || items[0] != '[') items = "[]";
+            StringBuilder sb = new StringBuilder(items.Length + 96);
+            sb.Append("{\"type\":\"queue\",\"mode\":\"").Append(JsonUtil.Escape(mode)).Append('"');
+            sb.Append(",\"random\":").Append(JsonUtil.GetBool(msg, "random", false) ? "true" : "false");
+            double index = JsonUtil.GetDouble(msg, "index", 0);
+            if (index < 0) index = 0;
+            sb.Append(",\"index\":").Append(JsonUtil.Num(index));
+            sb.Append(",\"items\":").Append(items);
+            sb.Append('}');
+            lastQueuePayload = sb.ToString();
+            PostToPage(lastQueuePayload);
         }
 
         // config is built page-side in production (settings publisher). The embedded demo config is a
@@ -1821,6 +1889,8 @@ namespace SpwFolia
         private const int WM_RBUTTONDOWN = 0x0204;
         private const int WM_RBUTTONUP = 0x0205;
         private const int WM_MOUSEWHEEL = 0x020A;
+        private const int WM_XBUTTONDOWN = 0x020B;
+        private const int WM_XBUTTONUP = 0x020C;
 
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint colorKey, byte alpha, int flags);
@@ -1912,7 +1982,8 @@ namespace SpwFolia
         {
             int msg = m.Msg;
             if (msg != WM_MOUSEMOVE && msg != WM_LBUTTONDOWN && msg != WM_LBUTTONUP
-                && msg != WM_RBUTTONDOWN && msg != WM_RBUTTONUP && msg != WM_MOUSEWHEEL) return false;
+                && msg != WM_RBUTTONDOWN && msg != WM_RBUTTONUP && msg != WM_MOUSEWHEEL
+                && msg != WM_XBUTTONDOWN && msg != WM_XBUTTONUP) return false;
 
             // v0.1.10: never narrow a message parameter with IntPtr.ToInt32(). On x64 .NET that is a
             // *checked* conversion and Win32 hands us WPARAM/LPARAM zero-extended to 64 bits, so any
@@ -1938,6 +2009,8 @@ namespace SpwFolia
             }
             // v0.2.2: the window region already decided that this point belongs to the page, so
             // everything arriving here is forwarded — no software hit test, no synthetic replay.
+            // v0.3.0: XBUTTON1/XBUTTON2 are forwarded too, so the page's window-level mousedown
+            // handler sees the mouse side "back" button (DOM button 3) and can exit Folia mode.
             if (msg == WM_MOUSEMOVE) HealDragState();
             if (msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN) BeginDrag();
             bool up = msg == WM_LBUTTONUP || msg == WM_RBUTTONUP;

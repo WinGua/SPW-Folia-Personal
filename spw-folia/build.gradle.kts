@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "dev.spw"
-version = "0.2.2"
+version = "0.3.0"
 
 // A global init.gradle on this machine injects Aliyun mirrors into every project and
 // thereby suppresses settings repos, so declare the repositories this build needs here.
@@ -69,9 +69,10 @@ spmod {
     PluginId = "dev.spw.folia"
     PluginName = "spw-folia"
     PluginDescription = "Folia fullscreen lyric mode for Salt Player for Windows"
-    PluginVersion = "0.2.2"
+    PluginVersion = "0.3.0"
     PluginProvider = "azkbzxf"
     PluginHasConfig = false
+    PluginOpenSourceUrl = "https://github.com/azkbzxf/spw-folia"
     PluginPermissions = listOf(PluginPermission.CLASS_TRANSFORM, PluginPermission.LIBRARY_READ)
 }
 

@@ -39,6 +39,8 @@ import {
     type HitRegion,
 } from '~/bridge';
 import PlayerBackgroundControl from '~/chrome/PlayerBackgroundControl';
+/* v0.3.0: bottom-centre playback HUD (progress bar; hover expands the control bar). */
+import PlaybackBar from '~/chrome/playback/PlaybackBar';
 import { useConfigPublisher } from '~/useConfigPublisher';
 
 interface AppProps {
@@ -255,11 +257,9 @@ const App: React.FC<AppProps> = ({ injected }) => {
                 enabled={state.transparentPlayerBackground}
                 onToggle={value => state.setTransparentPlayerBackground(value)}
                 label={t('options.transparentPlayerBackground')}
-                hint={t('options.transparentPlayerBackgroundDesc')}
                 passthrough={state.mousePassthrough}
                 onTogglePassthrough={value => state.setMousePassthrough(value)}
                 passthroughLabel="鼠标穿透（操作桌面）"
-                passthroughHint="开启后点击落到桌面，两个浮标仍可点"
                 compat={styleCompat}
                 compatNote={compatNote}
             />
@@ -277,6 +277,10 @@ const App: React.FC<AppProps> = ({ injected }) => {
             >
                 <Settings size={20} strokeWidth={1.75} />
             </button>
+            {/* v0.3.0: bottom-centre playback HUD (progress bar; hover expands the control bar).
+             *  Hidden while the settings overlay owns the stage; unmounts itself entirely under
+             *  mouse passthrough so no pixels and no hit region remain there. */}
+            <PlaybackBar settingsOpen={open} />
             <div
                 className="font-sans"
                 data-spw-settings-overlay={open ? 'true' : 'false'}

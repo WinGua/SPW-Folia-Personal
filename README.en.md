@@ -60,7 +60,7 @@ Windows 11; install "Microsoft Edge WebView2 Runtime" on Windows 10) · .NET Fra
 since Windows 10 1903). The full dependency matrix and crash troubleshooting live in
 [docs/runtime-requirements.md](docs/runtime-requirements.md).
 
-1. Download `spw-folia-0.2.2.spmod` from [Releases](https://github.com/azkbzxf/spw-folia/releases).
+1. Download `spw-folia-0.3.0.spmod` from [Releases](https://github.com/azkbzxf/spw-folia/releases).
 2. SPW → **Settings → Plugins / Workshop → Import plugin**, pick the file and enable it. Grant the
    **class-transform** ("hook") permission when asked — the menu hook needs it.
 3. Restart SPW when the plugin manager asks.
@@ -87,7 +87,7 @@ directory.
 
 ## Versions
 
-Currently **v0.2.2**. The `.spmod` and its SHA-256 checksum for every release are on
+Currently **v0.3.0**. The `.spmod` and its SHA-256 checksum for every release are on
 [GitHub Releases](https://github.com/azkbzxf/spw-folia/releases); per-version notes and acceptance
 evidence are archived in [docs/archive/](docs/archive/) rather than repeated here.
 
@@ -104,7 +104,7 @@ SDK required.
 ```bat
 :: 1) Plugin (Kotlin, via the official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.2.2.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.3.0.spmod
 
 :: 2) Native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -117,8 +117,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) Assemble the distributable .spmod (plugin classes + staged web bundle + native process + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.2.2.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.2.2.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.3.0.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.3.0.spmod
 ```
 
 The full pipeline, payload inventory, size budget and release checklist are in

@@ -22,7 +22,8 @@ import type { StyleMode } from './settings';
 export type TransparencyCompat = 'native' | 'tuned' | 'unsupported';
 
 export interface TransparencyCompatContext {
-    /** True when the cover-derived theme is a light one (`deriveThemeFromCover`). */
+    /** True when the effective theme is light: cover-derived while the window is opaque, the system
+     *  colour scheme while it is transparent (v0.3.0, `deriveTheme.ts`/`themeFromSample`). */
     isDaylight: boolean;
 }
 
