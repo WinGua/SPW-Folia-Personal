@@ -12,9 +12,12 @@ plugins {
 }
 
 group = "dev.spw"
-// CI test builds pass -PspwFoliaVersion=0.3.2-test so the patched .spmod installs beside a release
-// build instead of looking like the already-installed 0.3.1.
-version = providers.gradleProperty("spwFoliaVersion").getOrElse("0.3.1")
+// CI test builds set SPW_FOLIA_VERSION=0.3.2-test so the patched .spmod installs beside a release
+// build instead of looking like the already-installed 0.3.1. An environment variable is used
+// because a Windows .bat wrapper splits "-Pname=value" at '=', which Gradle then reads as a task.
+version = providers.environmentVariable("SPW_FOLIA_VERSION")
+    .orElse(providers.gradleProperty("spwFoliaVersion"))
+    .getOrElse("0.3.1")
 
 // A global init.gradle on this machine injects Aliyun mirrors into every project and
 // thereby suppresses settings repos, so declare the repositories this build needs here.
