@@ -92,7 +92,7 @@ Runtime”）· .NET Framework 4.8（Windows 10 1903 起内置）。完整依赖
 ```bat
 :: 1) 插件（Kotlin，官方 SPW 创意工坊 Gradle 插件）
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.3.0.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.3.1.spmod
 
 :: 2) 原生辅助进程（C# + WebView2）
 cd ..\poc\webview\host
@@ -105,8 +105,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) 组装可分发 .spmod（插件 classes + 暂存 web bundle + 原生进程 + 许可证）
 bash packaging/build-package.sh     :: 暂存 packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.3.0.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.3.0.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.3.1.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.3.1.spmod
 ```
 
 完整的打包流水线、payload 清单、大小预算与发布检查表见 [docs/release.md](docs/release.md)。
