@@ -60,6 +60,13 @@ internal class FoliaHostBridge(
     /** Opaque Folia settings tree (canonical JSON), updated from the page via stdout `settings`. */
     @Volatile var settingsTree: String? = null
 
+    /**
+     * Host version reported in the `hello` line. Set by [FoliaPlugin.start] to the *running* SPW
+     * version (1.19.2, 1.20.x, …); the compile-time constant is only a placeholder so the helper
+     * still gets a well-formed handshake when the plugin is driven by tests.
+     */
+    @Volatile var hostVersion: String = FoliaPlugin.SPW_VERSION
+
     /** Called when the helper reports `closed` (window closed by user/helper); plugin stays loaded. */
     @Volatile var onClosed: ((String) -> Unit)? = null
 
@@ -188,7 +195,7 @@ internal class FoliaHostBridge(
         startStdinWriter(p)
         sendLine(
             "{\"t\":\"hello\",\"protocol\":1,\"pluginVersion\":${Json.str(FoliaPlugin.PLUGIN_VERSION)}," +
-                "\"spwVersion\":${Json.str(FoliaPlugin.SPW_VERSION)},\"bundleDir\":${Json.str(web.absolutePath)}}"
+                "\"spwVersion\":${Json.str(hostVersion)},\"bundleDir\":${Json.str(web.absolutePath)}}"
         )
         settingsTree?.let { sendSettings(it) }
         log("host spawned pid=$pid")

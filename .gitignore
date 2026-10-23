@@ -68,3 +68,6 @@ poc/webview/host/repro/*.dll
 
 # promo-site capture scratch (raw recordings, ffmpeg binary, screenshots)
 /.tmp-capture/
+
+# isolated Gradle home used by the local build (Aliyun-mirror workaround)
+spw-folia/.gradle-home/

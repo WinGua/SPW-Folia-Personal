@@ -55,12 +55,13 @@ SPW is playing.
 
 ## Install
 
-**Requires**: Windows 10/11 x64 · **Salt Player for Windows 1.19.0** · WebView2 Runtime (bundled on
+**Requires**: Windows 10/11 x64 · **Salt Player for Windows 1.19.0 or newer** (1.19.0 and 1.19.2 are
+accepted) · WebView2 Runtime (bundled on
 Windows 11; install "Microsoft Edge WebView2 Runtime" on Windows 10) · .NET Framework 4.8 (bundled
 since Windows 10 1903). The full dependency matrix and crash troubleshooting live in
 [docs/runtime-requirements.md](docs/runtime-requirements.md).
 
-1. Download `spw-folia-0.3.0.spmod` from [Releases](https://github.com/azkbzxf/spw-folia/releases).
+1. Download `spw-folia-0.3.1.spmod` from [Releases](https://github.com/azkbzxf/spw-folia/releases).
 2. SPW → **Settings → Plugins / Workshop → Import plugin**, pick the file and enable it. Grant the
    **class-transform** ("hook") permission when asked — the menu hook needs it.
 3. Restart SPW when the plugin manager asks.
@@ -80,18 +81,21 @@ directory.
   been removed; the list of what remains is in
   [docs/known-inert-settings.md](docs/known-inert-settings.md).
 - **Windows only** — the helper depends on WebView2 and Windows WASAPI.
-- **Pinned to Salt Player for Windows 1.19.0** — the menu hook targets that host build; on other
-  versions the plugin refuses to install the hook (see [docs/hook-target.md](docs/hook-target.md)).
+- **Follows SPW patch releases** — the menu hook resolves the host class names at runtime (built-in
+  profiles for known builds, a structural scan of the host jar plus a per-version cache for unknown
+  ones), so 1.19.x patch releases work without a plugin update; anything below 1.19.0 is refused
+  explicitly and logged (see [docs/hook-target.md](docs/hook-target.md)).
 - Read-only with respect to your library: playback state, current track, lyrics and cover art are
   read, never written.
 
 ## Versions
 
-Currently **v0.3.0**. The `.spmod` and its SHA-256 checksum for every release are on
+Currently **v0.3.1**. The `.spmod` and its SHA-256 checksum for every release are on
 [GitHub Releases](https://github.com/azkbzxf/spw-folia/releases); per-version notes and acceptance
 evidence are archived in [docs/archive/](docs/archive/) rather than repeated here.
 
-The shipped artifact has been accepted end to end on Windows 11 against a real SPW 1.19.0: menu entry
+The shipped artifact has been accepted end to end on Windows 11 against a real SPW 1.19.0 **and
+1.19.2**: menu entry
 → fullscreen rendering, 14 styles scanned (15/15 screenshots), 0 page errors, 0 external network
 requests, a 16-minute soak, persisted settings and no orphaned helper processes.
 
@@ -104,7 +108,7 @@ SDK required.
 ```bat
 :: 1) Plugin (Kotlin, via the official SPW workshop Gradle plugin)
 cd spw-folia
-gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.3.0.spmod
+gradlew.bat plugin          :: -> build/libs/plugin-dev.spw.folia-0.3.1.spmod
 
 :: 2) Native helper (C# + WebView2)
 cd ..\poc\webview\host
@@ -117,8 +121,8 @@ pnpm install && pnpm build  :: -> dist/settings-ui.js
 :: 4) Assemble the distributable .spmod (plugin classes + staged web bundle + native process + licenses)
 bash packaging/build-package.sh     :: stages packaging/{web,native,licenses} + SHA256SUMS
 python packaging/tools/assemble-release.py ^
-    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.3.0.spmod ^
-    --staging packaging --out dist/release --name spw-folia-0.3.0.spmod
+    --spmod spw-folia/build/libs/plugin-dev.spw.folia-0.3.1.spmod ^
+    --staging packaging --out dist/release --name spw-folia-0.3.1.spmod
 ```
 
 The full pipeline, payload inventory, size budget and release checklist are in

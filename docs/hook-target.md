@@ -1,9 +1,63 @@
-# Hook target: inject "Folia" item into mini-player 更多 menu (SPW 1.19.0)
+# Hook target: inject "Folia" item into mini-player 更多 menu (SPW 1.19.0+)
 
-Status: **SOLVED** (2026-10-18). The working approach is **`hookMethod` on the host's item-adding
-helper**; the originally planned `appendContent` is **impossible on this R8-obfuscated host build**
-(root cause below). Implemented in `spw-folia/src/main/kotlin/dev/spw/folia/FoliaPlugin.kt`
-(owner: hook-poc). Deep background: `docs/archive/re-host.md`.
+Status: **version-independent since v0.3.1** (2026-10-23). The obfuscated names below are *data*, not
+code: `HostTargets` resolves them per host build and caches the result, so a new SPW patch release no
+longer needs a plugin release.
+
+The working approach is **`hookMethod` on the host's item-adding helper**; the originally planned
+`appendContent` is **impossible on this R8-obfuscated host build** (root cause below). Implemented
+in `spw-folia/src/main/kotlin/dev/spw/folia/FoliaPlugin.kt` (owner: hook-poc). Deep background:
+`docs/archive/re-host.md`.
+
+## Resolution layers (v0.3.1+)
+
+SPW is R8-obfuscated, so **every release renames the classes and methods we touch** — 1.19.2 kept the
+structure but renamed `ē`/`ন`/`Ⴈ` to `घ`/`Ը`/`ะ`. The plugin therefore resolves its targets at
+runtime (`spw-folia/src/main/kotlin/dev/spw/folia/HostTargets.kt`):
+
+| layer | when | cost |
+| --- | --- | --- |
+| `host-targets.json` cache (keyed by `spwVersion`) | every start after the first success on that build | ~0 |
+| built-in profile (`PROFILES`: 1.19.2, 1.19.0) | known builds | ~0 |
+| structural classpath scan | unknown build — background thread, does not stall start-up | ~0.5–2 s once |
+
+Every layer is **validated by reflection** before use (helper signature + scope bridge + palette
+getter), so a stale name is never trusted. The scan finds the helper by shape —
+`(Track, PiscesMediaItem, <PopupState>, Navigator, State, <MenuFlyoutScope>)` is unique in the host
+and three of those types are not obfuscated — then splits the two `androidx.compose.ui.*` parameters
+by looking for the interface that carries the Kotlin default-argument item bridge.
+
+Two host facts the scan works around:
+
+- **The jar's zip entry names cannot be trusted.** Several entries are stored under a name that
+  differs from the class they contain (`androidx/compose/ui/Ϡ.class` holds `…/ϡ`), so candidates are
+  identified by the `this_class` parsed out of the class file, never by the entry path.
+- **`java.class.path` is a single polyglot jar** (`app/ffmpeg-x64.dll`), readable with `ZipFile`.
+
+### Known profiles
+
+| build | menu facade | helper | MenuFlyoutScope (bridge) | PopupState (dismiss) |
+| --- | --- | --- | --- | --- |
+| 1.19.0 | `androidx.compose.ui.ē` (U+0113) | `Ϳ` | `androidx.compose.ui.ন` (U+09A8) / `Ϳ` | `androidx.compose.ui.Ⴈ` (U+10A8) / `ԩ` |
+| 1.19.2 | `androidx.compose.ui.घ` (U+0918) | `Ϳ` | `androidx.compose.ui.Ը` (U+0538) / `Ϳ` | `androidx.compose.ui.ะ` (U+0E30) / `ԩ` |
+
+Verified on 1.19.2 (Steam build) from `…/Salt Player for Windows/app/ffmpeg-x64.dll`:
+`घ.Ϳ(Track, PiscesMediaItem, ะ, Navigator, State, Ը)Unit`, scope impl `ʎ$Ϳ` (items list field `Ϳ`),
+flyout content colour still `ʰ.Ԩ(composer).Ԩ()`. The **playback-controls** reflection
+(`FoliaPlaybackControls.kt`) needed no change — `PlaybackQueueState`'s field order and
+`com.xuncorp.spc.core.queue.Ϳ` survived the rename.
+
+Log lines to look for in `spw-folia.log`:
+
+```
+host menu profile:1.19.2: androidx.compose.ui.घ.Ϳ(Track, PiscesMediaItem, ะ, Navigator, State, Ը)
+hookMethod installed: … (profile:1.19.2)
+Folia item appended (scope=androidx.compose.ui.ʎ$Ϳ, bridge=Ϳ)
+```
+
+`unsupported SPW version …` appears only below 1.19.0. An unknown newer build logs
+`scanning the host classpath in the background`, then either the resolved target or
+`could not locate the 更多 flyout`.
 
 ## What the menu is
 

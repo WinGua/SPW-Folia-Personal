@@ -18,10 +18,12 @@ import java.awt.event.KeyEvent
 import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 import java.io.File
+import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.time.LocalDateTime
 import java.util.Collections
 import java.util.WeakHashMap
+import java.util.concurrent.ConcurrentHashMap
 import javax.swing.JComponent
 import javax.swing.JFrame
 import javax.swing.JLabel
@@ -47,12 +49,10 @@ import javax.swing.SwingUtilities
  *    We hook the non-composable helper that adds the four host menu items and append
  *    our item to the MenuFlyoutScope after it returns.
  *
- * Host pins (SPW 1.19.0):
- *  - menu file facade: androidx.compose.ui.ē  (PlayerMoreMenuFlyoutKt)
- *  - item-adding helper:  ē.Ϳ(Track, PiscesMediaItem, PopupState, Navigator, State, MenuFlyoutScope)
- *  - MenuFlyoutScope interface: androidx.compose.ui.ন; item bridge:
- *      static ন.Ϳ(ন scope, Function0 onClick, Function2 content)
- *  - PopupState: androidx.compose.ui.Ⴈ; dismiss = Ⴈ.ԩ()
+ * Host targets are resolved at runtime by [HostTargets] instead of being pinned to one build:
+ * SPW is R8-obfuscated, so 1.19.1/1.19.2 renamed every class and method we touch (the 1.19.0
+ * pair `ē`/`ন`/`Ⴈ` became `घ`/`Ը`/`ะ`). Known builds are matched by a validated profile, unknown
+ * ones by a structural classpath scan, and the outcome is cached per host version.
  */
 class FoliaPlugin(
     pluginContext: PluginContext
@@ -70,6 +70,17 @@ class FoliaPlugin(
     private val settingsStore = FoliaSettingsStore(::log)
     private var settingsTree: String = "{}"
 
+    /** Host build this process runs on, e.g. 1.19.2. */
+    private val hostVersion: HostTargets.Version? =
+        HostTargets.Version.parse(pluginContext.spwVersion)
+
+    /** Menu injection target for this host build; null until [HostTargets] resolved it. */
+    @Volatile
+    private var menuTarget: HostTargets.MenuTarget? = null
+
+    /** Fields of MenuFlyoutScope implementations that hold the item list, cached per class. */
+    private val scopeListFields = ConcurrentHashMap<String, Field?>()
+
     override fun start() {
         instance = this
         log(
@@ -82,6 +93,7 @@ class FoliaPlugin(
 
         settingsTree = settingsStore.load()
         bridge.settingsTree = settingsTree
+        bridge.hostVersion = pluginContext.spwVersion
         // Fallback snapshot keeps the state line flowing at 100 ms even if the PF4J extension is
         // not instantiated yet (proves the bridge/clocks even on a bare host); the extension
         // replaces it as soon as PF4J creates it from META-INF/extensions.idx.
@@ -99,8 +111,12 @@ class FoliaPlugin(
         bridge.onClosed = { reason -> log("folia window closed (reason=$reason); plugin stays loaded") }
         startExtensionWatch()
 
-        if (pluginContext.spwVersion != SPW_VERSION) {
-            log("unsupported SPW version ${pluginContext.spwVersion}; hook not installed")
+        val version = hostVersion
+        if (version == null || version < HostTargets.Version.MIN_SUPPORTED) {
+            log(
+                "unsupported SPW version ${pluginContext.spwVersion} " +
+                    "(need >= ${HostTargets.Version.MIN_SUPPORTED}); hook not installed"
+            )
             return
         }
         if (!runCatching { WorkshopApi.manager.isPermissionGranted(PluginPermission.CLASS_TRANSFORM) }
@@ -110,8 +126,40 @@ class FoliaPlugin(
             toast("spw-folia: class-transform permission missing", WorkshopApi.Ui.ToastType.Error)
             return
         }
-        installHook()
+        installHookForHostBuild()
         log("start done")
+    }
+
+    /**
+     * Installs the flyout hook on this host build.
+     *
+     * Known builds (cache + profiles) resolve instantly and are hooked before `start()` returns —
+     * the historical behaviour. An unknown build needs a classpath scan of the host jar, so it runs
+     * on a background thread to keep the host UI start-up free of a one-off 1-2 s stall; the
+     * registration is retried because the hook API only accepts the starting/started plugin.
+     */
+    private fun installHookForHostBuild() {
+        val dir = File(pluginContext.pluginPath)
+        val version = pluginContext.spwVersion
+        if (HostTargets.quickLoad(dir, version, ::log)) {
+            installHook()
+            return
+        }
+        log("host build $version matched no known profile; scanning the host classpath in the background")
+        val worker = Thread({
+            val target = HostTargets.deepResolve(dir, version, ::log)
+            if (target == null) {
+                log("WARNING: could not locate the 更多 flyout in ${pluginContext.spwVersion}; the Folia menu item will be missing")
+                return@Thread
+            }
+            for (attempt in 1..HOOK_RETRY_COUNT) {
+                if (installHook()) return@Thread
+                Thread.sleep(HOOK_RETRY_DELAY_MS)
+                log("hook retry $attempt/${HOOK_RETRY_COUNT} after registration failure")
+            }
+        }, "spw-folia-target-resolve")
+        worker.isDaemon = true
+        worker.start()
     }
 
     override fun stop() {
@@ -167,12 +215,17 @@ class FoliaPlugin(
 
     // ---------------------------------------------------------------- hook ----
 
-    private fun installHook() {
+    private fun installHook(): Boolean {
+        val target = HostTargets.menu ?: menuTarget
+        if (target == null) {
+            log("installHook: no host menu target resolved yet")
+            return false
+        }
         val result = runCatching {
             WorkshopApi.hookRegistrar.hookMethod(
-                MENU_FILE_CLASS,
-                ADD_ITEMS_METHOD,
-                ADD_ITEMS_PARAM_TYPES,
+                target.menuClass,
+                target.addItemsMethod,
+                target.addItemsParams,
                 object : MethodHook() {
                     override fun after(call: MethodHookParam) {
                         try {
@@ -186,7 +239,7 @@ class FoliaPlugin(
                                 log("after: null MenuFlyoutScope")
                                 return
                             }
-                            appendFoliaItem(scope, args[2])
+                            appendFoliaItem(scope, args[2], target)
                         } catch (t: Throwable) {
                             log("after hook error: ${t::class.java.name}: ${t.message}")
                         }
@@ -196,38 +249,41 @@ class FoliaPlugin(
         }
         result.onSuccess {
             methodHook = it
-            log("hookMethod installed: $it")
+            menuTarget = target
+            log("hookMethod installed: $it (${target.origin})")
             toast("spw-folia: Folia menu item hook installed", WorkshopApi.Ui.ToastType.Success)
         }.onFailure {
             log("hookMethod FAILED: ${it::class.java.name}: ${it.message}")
             toast("spw-folia: hook failed (${it.message})", WorkshopApi.Ui.ToastType.Error)
         }
+        return result.isSuccess
     }
 
     /**
      * Appends one "Folia" item to the live MenuFlyoutScope.
      *
      * Host's own helper adds its four items through the Kotlin default-argument bridge
-     * `MenuFlyoutScope.item(onClick, content)` (static JVM method ন.Ϳ(ন, Function0, Function2)).
-     * This bridge calls the interface `item(onClick, enabled=true, content)` implementation,
-     * which is exactly what the host's four items do, so the popup renders our item too.
+     * `MenuFlyoutScope.item(onClick, content)` — a static JVM method on the scope interface itself,
+     * whose name is resolved per host build by [HostTargets]. It calls the interface implementation
+     * `item(onClick, enabled=true, content)`, exactly like the host's four items, so the popup
+     * renders our item too.
      */
-    private fun appendFoliaItem(scope: Any, popupState: Any?) {
+    private fun appendFoliaItem(scope: Any, popupState: Any?, target: HostTargets.MenuTarget) {
         val dedupeKey = scopeBackingList(scope) ?: scope
         if (appendedLists.putIfAbsent(dedupeKey, true) != null) {
             return
         }
         try {
-            val scopeClass = Class.forName(SCOPE_CLASS)
+            val scopeClass = Class.forName(target.scopeClass)
             val function0 = Class.forName("kotlin.jvm.functions.Function0")
             val function2 = Class.forName("kotlin.jvm.functions.Function2")
             val bridgeMethod: Method = scopeClass.getDeclaredMethod(
-                ITEM_BRIDGE_METHOD, scopeClass, function0, function2
+                target.scopeBridge, scopeClass, function0, function2
             )
 
             val onClick: () -> Unit = {
                 log("Folia item clicked")
-                runCatching { dismissPopup(popupState) }
+                runCatching { dismissPopup(popupState, target) }
                     .onFailure { log("dismissPopup failed: ${it::class.java.name}: ${it.message}") }
                 openFolia()
             }
@@ -243,21 +299,29 @@ class FoliaPlugin(
         }
     }
 
-    /** The MenuFlyoutScope implementation keeps its items in a mutable List field (U+037F). */
-    private fun scopeBackingList(scope: Any): Any? = try {
-        val field = scope.javaClass.getDeclaredField(SCOPE_LIST_FIELD)
-        field.isAccessible = true
-        field.get(scope)
-    } catch (t: Throwable) {
-        null
+    /**
+     * The MenuFlyoutScope implementation keeps its items in a `List` field. 1.19.0 and 1.19.2 both
+     * name it Ϳ, but the field is discovered by type so a rename cannot break the recomposition
+     * de-duplication (a null result simply degrades to keying on the scope instance).
+     */
+    private fun scopeBackingList(scope: Any): Any? {
+        val field = scopeListFields.computeIfAbsent(scope.javaClass.name) { _ ->
+            runCatching {
+                scope.javaClass.declaredFields.firstOrNull {
+                    java.util.List::class.java.isAssignableFrom(it.type) &&
+                        !java.lang.reflect.Modifier.isStatic(it.modifiers)
+                }?.apply { isAccessible = true }
+            }.getOrNull()
+        } ?: return null
+        return runCatching { field.get(scope) }.getOrNull()
     }
 
-    private fun dismissPopup(popupState: Any?) {
+    private fun dismissPopup(popupState: Any?, target: HostTargets.MenuTarget) {
         if (popupState == null) return
-        val dismiss: Method? = popupState.javaClass.methods.firstOrNull {
-            it.name == POPUP_DISMISS_METHOD &&
-                it.parameterCount == 0 &&
-                it.returnType == Void.TYPE
+        val dismiss: Method? = target.popupDismiss?.let { name ->
+            popupState.javaClass.methods.firstOrNull {
+                it.name == name && it.parameterCount == 0 && it.returnType == Void.TYPE
+            }
         }
         if (dismiss == null) {
             log("dismissPopup: no dismiss method on ${popupState.javaClass.name}")
@@ -347,39 +411,16 @@ class FoliaPlugin(
     }
 
     companion object {
+        /** Shown in the helper handshake until [start] forwards the real host version. */
         const val SPW_VERSION = "1.19.0"
-        const val PLUGIN_VERSION = "0.3.0"
+        const val PLUGIN_VERSION = "0.3.1"
 
         /** How long the start-up watcher waits for PF4J to instantiate the playback extension. */
         private const val EXTENSION_WATCH_MS = 20_000L
 
-        /** androidx.compose.ui.ē — PlayerMoreMenuFlyoutKt file facade. */
-        private const val MENU_FILE_CLASS = "androidx.compose.ui.\u0113"
-
-        /** Obfuscated JVM name of the helper that adds the four host menu items. */
-        private const val ADD_ITEMS_METHOD = "\u037f"
-
-        /** Full JVM parameter type list of that helper (exact match required by hookMethod). */
-        private val ADD_ITEMS_PARAM_TYPES = listOf(
-            "com.xuncorp.voxzen.data.entity.Track",
-            "com.xuncorp.pisces.PiscesMediaItem",
-            "androidx.compose.ui.\u10a8",              // PopupState
-            "com.xuncorp.voxzen.ui.navigation.Navigator",
-            "androidx.compose.runtime.State",
-            "androidx.compose.ui.\u09a8"               // MenuFlyoutScope
-        )
-
-        /** androidx.compose.ui.ন — MenuFlyoutScope. */
-        private const val SCOPE_CLASS = "androidx.compose.ui.\u09a8"
-
-        /** Static default-argument bridge `MenuFlyoutScope.item(onClick, content)`. */
-        private const val ITEM_BRIDGE_METHOD = "\u037f"
-
-        /** Field of the MenuFlyoutScope implementation that holds the item list. */
-        private const val SCOPE_LIST_FIELD = "\u037f"
-
-        /** PopupState.ԩ() — close the flyout. */
-        private const val POPUP_DISMISS_METHOD = "\u0529"
+        /** Hook registration retries while the plugin's "started" transition settles. */
+        private const val HOOK_RETRY_COUNT = 20
+        private const val HOOK_RETRY_DELAY_MS = 500L
 
         /** Dev checkout root, used only as a fallback while assets are not packaged next to the plugin. */
         private const val DEV_ROOT = "D:/输出目录/dsh2"

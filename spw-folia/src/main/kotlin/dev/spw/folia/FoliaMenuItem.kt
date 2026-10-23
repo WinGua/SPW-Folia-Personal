@@ -62,27 +62,31 @@ internal fun FoliaMenuItemContent() {
 }
 
 /**
- * `androidx.compose.ui.ʰ.Ԩ(Composer): androidx.compose.ui.ʹ` —
- * reads SPW's theme palette object from the composition (same call the host's
- * MenuFlyoutItemCompat makes for its default contentColor).
+ * Reads SPW's theme palette object from the composition, then its content colour.
+ *
+ * `androidx.compose.ui.ʰ.Ԩ(Composer): androidx.compose.ui.ʹ` followed by `ʹ.Ԩ(): long` in 1.19.x —
+ * the same two calls the host's `MenuFlyoutItemCompat` makes for its default `contentColor`. Both
+ * are resolved per host build by [HostTargets] (and cached), so this keeps working when an SPW
+ * update renames the palette classes.
  */
-private val hostThemePaletteMethod: Method? by lazy {
+private val paletteAccessorMethod: Method? by lazy {
     runCatching {
-        Class.forName("androidx.compose.ui.ʰ")
-            .getDeclaredMethod("Ԩ", androidx.compose.runtime.Composer::class.java)
+        val target = HostTargets.palette ?: return@runCatching null
+        Class.forName(target.accessorClass)
+            .getDeclaredMethod(target.accessorMethod, androidx.compose.runtime.Composer::class.java)
             .apply { isAccessible = true }
     }.getOrNull()
 }
 
 /**
- * `androidx.compose.ui.ʹ.Ԩ(): long` — the palette's content colour, packed as a
- * Compose [Color] long. The palette stores its colours in `MutableState` fields, so
- * reading it during composition also subscribes us to theme changes.
+ * The palette's content colour, packed as a Compose [Color] long. The palette stores its colours in
+ * `MutableState` fields, so reading it during composition also subscribes us to theme changes.
  */
-private val hostPaletteColorMethod: Method? by lazy {
+private val paletteColorMethod: Method? by lazy {
     runCatching {
-        Class.forName("androidx.compose.ui.ʹ")
-            .getDeclaredMethod("Ԩ")
+        val target = HostTargets.palette ?: return@runCatching null
+        Class.forName(target.paletteClass)
+            .getDeclaredMethod(target.colorMethod)
             .apply { isAccessible = true }
     }.getOrNull()
 }
@@ -90,8 +94,8 @@ private val hostPaletteColorMethod: Method? by lazy {
 /** Current host flyout content colour, or null when the host theme API is unavailable. */
 @Composable
 private fun hostFlyoutContentColor(): Color? {
-    val readPalette = hostThemePaletteMethod ?: return null
-    val readColor = hostPaletteColorMethod ?: return null
+    val readPalette = paletteAccessorMethod ?: return null
+    val readColor = paletteColorMethod ?: return null
     // `currentComposer` is a @Composable read, so it must happen outside runCatching
     // (the Compose compiler rejects composable calls inside it).
     val composer = currentComposer

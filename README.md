@@ -47,12 +47,12 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
 
 ## 安装
 
-**要求**：Windows 10/11 x64 · **Salt Player for Windows 1.19.0** · WebView2 Runtime（Windows 11
-内置，Windows 10 需安装 “Microsoft Edge WebView2 Runtime”）· .NET Framework 4.8（Windows 10
-1903 起内置）。完整依赖矩阵与闪退排查见
+**要求**：Windows 10/11 x64 · **Salt Player for Windows 1.19.0 及以上**（1.19.0 / 1.19.2 均已
+验收）· WebView2 Runtime（Windows 11 内置，Windows 10 需安装 “Microsoft Edge WebView2
+Runtime”）· .NET Framework 4.8（Windows 10 1903 起内置）。完整依赖矩阵与闪退排查见
 [docs/runtime-requirements.md](docs/runtime-requirements.md)。
 
-1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 下载 `spw-folia-0.3.0.spmod`。
+1. 从 [Releases](https://github.com/azkbzxf/spw-folia/releases) 下载 `spw-folia-0.3.1.spmod`。
 2. SPW → **设置 → 插件 / 创意工坊 → 导入插件**，选择该文件并启用；询问时授予 **class-transform**
    （「钩子」）权限——菜单 hook 需要它。
 3. 插件管理器提示时重启 SPW。
@@ -70,18 +70,19 @@ Windows（SPW）**：迷你播放器「更多」菜单里的 `Folia` 条目打�
   渲染与 Folia 完全一致。设置页已移除所有不会生效的控件，保留项清单见
   [docs/known-inert-settings.md](docs/known-inert-settings.md)。
 - **仅支持 Windows** —— 辅助进程依赖 WebView2 + Windows WASAPI。
-- **锁定 Salt Player for Windows 1.19.0** —— 菜单 hook 针对该宿主版本，其它版本上插件拒绝安装
-  hook（见 [docs/hook-target.md](docs/hook-target.md)）。
+- **跟随 SPW 小版本升级** —— 菜单 hook 的宿主类名在运行时解析（已知版本走内置映射表，未知版本
+  扫描宿主 jar 的结构后缓存），因此 1.19.0 起的补丁版（1.19.2 等）无需重新发版即可用；
+  `1.19.0` 以下会明确拒绝注入并记日志（见 [docs/hook-target.md](docs/hook-target.md)）。
 - 只读取播放状态与当前歌曲 / 歌词 / 封面，不写入音乐库。
 
 ## 版本
 
-当前 **v0.3.0**。每个版本的 `.spmod` 与 SHA-256 校验值都在
+当前 **v0.3.1**。每个版本的 `.spmod` 与 SHA-256 校验值都在
 [GitHub Releases](https://github.com/azkbzxf/spw-folia/releases)；逐版变更与验收证据归档在
 [docs/archive/](docs/archive/)，仓库内不再重复。
 
-发布产物已在 Windows 11 + 真实 SPW 1.19.0 上完成端到端验收：菜单条目 → 全屏渲染、14 种样式
-15/15 扫描、0 页面错误、0 外部网络请求、16 分钟长稳、设置持久化、无残留辅助进程。
+发布产物已在 Windows 11 + 真实 SPW **1.19.0 与 1.19.2** 上完成端到端验收：菜单条目 → 全屏渲染、
+14 种样式 15/15 扫描、0 页面错误、0 外部网络请求、16 分钟长稳、设置持久化、无残留辅助进程。
 
 ## 从源码构建
 

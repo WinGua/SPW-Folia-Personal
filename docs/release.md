@@ -126,6 +126,18 @@ node packaging/tools/verify-layout.mjs       # 4. packaged-layout acceptance on 
 and fails if required files are missing or dev paths leak in. The plugin's `resolveHelper()` accepts the
 helper under `native/` and `lib/` (plus dev-only fallbacks), so either layout spawns from the installed payload.
 
+**Compatibility-only releases** (v0.3.1): when a release touches nothing but `classes/`, do **not**
+re-stage `packaging/` — the checkout's `native/` and `web/settings/settings-ui.js` can be older than
+what shipped, which would silently regress the helper and the settings island. Splice the new classes
+onto the previous *published* artifact instead and assert the payload is byte-identical:
+
+```bash
+gh release download v0.3.0 -p spw-folia-0.3.0.spmod -O dist/release/spw-folia-0.3.0-ref.spmod
+python packaging/tools/splice-compat-release.py     # -> dist/release/spw-folia-0.3.1.spmod + .json
+```
+
+The script keeps every non-`classes/` entry as-is and fails if any payload CRC changed.
+
 Per-version artifact records (byte sizes, payload hashes, changed-entry lists) are no longer kept
 inline; see the release-artifact ledger at the end of this document, and `docs/archive/` for the
 historical release notes and verification reports.
