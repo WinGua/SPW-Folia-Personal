@@ -12,7 +12,9 @@ plugins {
 }
 
 group = "dev.spw"
-version = "0.3.1"
+// CI test builds pass -PspwFoliaVersion=0.3.2-test so the patched .spmod installs beside a release
+// build instead of looking like the already-installed 0.3.1.
+version = providers.gradleProperty("spwFoliaVersion").getOrElse("0.3.1")
 
 // A global init.gradle on this machine injects Aliyun mirrors into every project and
 // thereby suppresses settings repos, so declare the repositories this build needs here.
@@ -69,11 +71,16 @@ spmod {
     PluginId = "dev.spw.folia"
     PluginName = "spw-folia"
     PluginDescription = "Folia fullscreen lyric mode for Salt Player for Windows"
-    PluginVersion = "0.3.1"
+    PluginVersion = version.toString()
     PluginProvider = "azkbzxf"
     PluginHasConfig = false
     PluginOpenSourceUrl = "https://github.com/azkbzxf/spw-folia"
-    PluginPermissions = listOf(PluginPermission.CLASS_TRANSFORM, PluginPermission.LIBRARY_READ)
+    // v0.3.2: KEY_BINDINGS backs the user-configurable open/close shortcut (SPW 快捷键管理).
+    PluginPermissions = listOf(
+        PluginPermission.CLASS_TRANSFORM,
+        PluginPermission.LIBRARY_READ,
+        PluginPermission.KEY_BINDINGS
+    )
 }
 
 // ---------------------------------------------------------------------------------------------

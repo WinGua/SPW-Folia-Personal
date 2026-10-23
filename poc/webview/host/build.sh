@@ -34,6 +34,7 @@ console.log('DefaultConfig.json:', fs.statSync('DefaultConfig.json').size, 'byte
   -r:"$SDK\\Microsoft.Web.WebView2.WinForms.dll" \
   "$(cygpath -w "$(pwd)/Program.cs")" \
   "$(cygpath -w "$(pwd)/DpiSupport.cs")" \
+  "$(cygpath -w "$(pwd)/MonitorSupport.cs")" \
   "$(cygpath -w "$(pwd)/HostForm.cs")" \
   "$(cygpath -w "$(pwd)/AudioProvider.cs")" \
   "$(cygpath -w "$(pwd)/audio/AudioInterop.cs")" \
