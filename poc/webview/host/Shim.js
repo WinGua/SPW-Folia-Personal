@@ -364,6 +364,18 @@
     post({ type: 'action', name: 'close' });
   }, true);
 
+  // Multi-monitor: Alt+left-drag anywhere on the player page moves the borderless window to another
+  // monitor. The host hands the window to Windows' native move loop (WM_NCLBUTTONDOWN/HTCAPTION) and
+  // re-fullscreens on the monitor it was dropped on; skipping the settings overlay keeps its inputs
+  // and sliders working normally.
+  document.addEventListener('mousedown', function (e) {
+    if (!e || e.button !== 0 || !e.altKey) return;
+    if (isSettingsOpen()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    post({ type: 'windowDrag' });
+  }, true);
+
   // ---------------------------------------------------------------- rAF metrics
 
   var frames = 0;
