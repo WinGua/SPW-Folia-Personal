@@ -140,6 +140,18 @@ namespace SpwFolia
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
+        // Multi-monitor (v0.3.2): the window opens on the screen that hosts the SPW window, and
+        // Alt+drag anywhere on the visualizer hands the window to the native move loop so it can be
+        // dragged to another monitor; releasing the mouse re-fullscreens on the monitor it landed on.
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool ReleaseCapture();
+
+        private const int WM_NCLBUTTONDOWN = 0x00A1;
+        private const int WM_EXITSIZEMOVE = 0x0232;
+        private const int HTCAPTION = 2;
+        private bool userMoved;
+        private bool dragging;
+
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern IntPtr PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -358,6 +370,13 @@ namespace SpwFolia
                 // mouse), so the keyboard must be able to leave *and* re-enter the mode.
                 if (transparencyActive) ExitTransparentMode("hotkey");
                 else EnterTransparentMode("hotkey");
+                return;
+            }
+            if (m.Msg == WM_EXITSIZEMOVE)
+            {
+                base.WndProc(ref m);
+                // Alt+drag finished: snap the fullscreen window to the monitor it was dropped on.
+                SafeBeginInvoke(SnapToMonitorAfterMove);
                 return;
             }
             base.WndProc(ref m);
@@ -621,8 +640,11 @@ namespace SpwFolia
         {
             base.OnDpiChanged(e);
             log.Log("info", "dpi-changed old=" + e.DeviceDpiOld + " new=" + e.DeviceDpiNew
-                + " suggested=" + e.SuggestedRectangle.Width + "x" + e.SuggestedRectangle.Height);
-            ApplyWindowGeometry("dpi-changed");
+                + " suggested=" + e.SuggestedRectangle.Width + "x" + e.SuggestedRectangle.Height
+                + " dragging=" + dragging);
+            // While Alt+drag crosses monitors Windows owns the geometry; re-applying our fullscreen
+            // rectangle here would fight the move loop. The post-drag snap re-applies it.
+            if (!dragging) ApplyWindowGeometry("dpi-changed");
             SyncWebViewBounds("dpi-changed");
         }
 
@@ -636,12 +658,20 @@ namespace SpwFolia
         /// Applies the requested window mode using live monitor metrics. A fullscreen request that
         /// resolves to something implausibly small (the reported plugin-spawned "8x6" viewport case)
         /// falls back to the monitor work area / default window size instead of showing a sliver.
+        ///
+        /// Multi-monitor: the monitor is the one hosting the SPW window that spawned this helper
+        /// (resolved from the parent PID), not the system primary. Once the user has dragged the
+        /// window (Alt+drag), later geometry passes - DPI change, tiny-viewport recovery - keep the
+        /// monitor the window is on instead of pulling it back to SPW.
         /// </summary>
         private void ApplyWindowGeometry(string reason)
         {
             try
             {
-                Screen monitor = Screen.PrimaryScreen;
+                Screen monitor = userMoved
+                    ? Screen.FromRectangle(Bounds)
+                    : MonitorSupport.ScreenForProcess(DpiSupport.ParentProcessId());
+                if (monitor == null) monitor = Screen.PrimaryScreen;
                 if (monitor == null) return;
                 Rectangle mon = monitor.Bounds;
                 Rectangle work = monitor.WorkingArea;
@@ -676,6 +706,9 @@ namespace SpwFolia
                     + " bounds=" + Bounds.X + "," + Bounds.Y + " " + Bounds.Width + "x" + Bounds.Height
                     + " client=" + ClientSize.Width + "x" + ClientSize.Height
                     + " screen=" + mon.Width + "x" + mon.Height
+                    + " screenAt=" + mon.X + "," + mon.Y
+                    + " primary=" + (Screen.PrimaryScreen != null && Screen.PrimaryScreen.Bounds == mon ? "yes" : "no")
+                    + " anchor=" + (userMoved ? "dragged" : "spw-window")
                     + " workarea=" + work.Width + "x" + work.Height
                     + " dpi=" + DpiValue()
                     + " winDpi=" + DpiSupport.DpiForWindow(Handle)
@@ -684,6 +717,56 @@ namespace SpwFolia
                 ApplyInputCatcherBounds();
             }
             catch (Exception ex) { log.Error("geometry", ex); }
+        }
+
+        /// <summary>
+        /// Alt+drag from the page: hand the window to Windows' native caption-move loop so it can be
+        /// dragged to another monitor exactly like a normal window. The page posts
+        /// <c>{"type":"windowDrag"}</c> on Alt+left-mouse-down (Shim.js); no JavaScript drag math and
+        /// no per-monitor coordinate translation is needed.
+        /// </summary>
+        private void BeginWindowDrag()
+        {
+            if (!IsHandleCreated || closing) return;
+            try
+            {
+                // Mark first: a DPI change fires mid-drag, and ApplyWindowGeometry must then keep the
+                // monitor the window is being dragged to instead of re-anchoring to SPW's monitor.
+                userMoved = true;
+                dragging = true;
+                log.Log("info", "window-drag start bounds=" + Bounds.X + "," + Bounds.Y
+                    + " " + Bounds.Width + "x" + Bounds.Height);
+                ReleaseCapture();
+                SendMessage(Handle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+            }
+            catch (Exception ex) { log.Error("window-drag", ex); }
+        }
+
+        /// <summary>
+        /// After a drag, a fullscreen window fills the monitor it was dropped on (same rule as the
+        /// opening geometry, just anchored to the window instead of SPW).
+        /// </summary>
+        private void SnapToMonitorAfterMove()
+        {
+            dragging = false;
+            if (closing || IsDisposed || !userMoved) return;
+            try
+            {
+                Screen target = Screen.FromRectangle(Bounds);
+                if (target == null) return;
+                log.Log("info", "window-drag end bounds=" + Bounds.X + "," + Bounds.Y
+                    + " " + Bounds.Width + "x" + Bounds.Height
+                    + " screenAt=" + target.Bounds.X + "," + target.Bounds.Y
+                    + " fullscreen=" + args.Fullscreen);
+                if (!args.Fullscreen) return;
+                if (Bounds == target.Bounds) return;
+                Bounds = target.Bounds;
+                SyncWebViewBounds("drag-snap");
+                ApplyInputCatcherBounds();
+                log.Log("info", "window-drag snap bounds=" + Bounds.X + "," + Bounds.Y
+                    + " " + Bounds.Width + "x" + Bounds.Height);
+            }
+            catch (Exception ex) { log.Error("window-drag-snap", ex); }
         }
 
         /// <summary>
@@ -766,8 +849,10 @@ namespace SpwFolia
         {
             base.OnLoad(e);
             if (!geometryApplied) ApplyWindowGeometry("load");
-            Rectangle mon = Screen.PrimaryScreen != null ? Screen.PrimaryScreen.Bounds : Rectangle.Empty;
-            Rectangle work = Screen.PrimaryScreen != null ? Screen.PrimaryScreen.WorkingArea : Rectangle.Empty;
+            Screen host = MonitorSupport.ScreenForProcess(DpiSupport.ParentProcessId());
+            if (host == null) host = Screen.PrimaryScreen;
+            Rectangle mon = host != null ? host.Bounds : Rectangle.Empty;
+            Rectangle work = host != null ? host.WorkingArea : Rectangle.Empty;
             log.Log("info", "host-start pid=" + Process.GetCurrentProcess().Id
                 + " parentPid=" + DpiSupport.ParentProcessId()
                 + " fullscreen=" + args.Fullscreen
@@ -1065,6 +1150,12 @@ namespace SpwFolia
             else if (type == "hitbox")
             {
                 UpdateHitRegions(msg);
+            }
+            else if (type == "windowDrag")
+            {
+                // Alt+drag on the visualizer (Shim.js) -> native move loop, so the window can be
+                // dragged to another monitor and snaps to it on release.
+                SafeBeginInvoke(delegate { BeginWindowDrag(); });
             }
             else if (type == "action")
             {
