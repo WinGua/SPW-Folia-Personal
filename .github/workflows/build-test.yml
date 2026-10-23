@@ -1,0 +1,87 @@
+name: build-test
+
+# Personal test build: builds the plugin and the native helper, wraps them into the published
+# .spmod, and publishes the result as the rolling pre-release `test-latest`.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - test
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Restore WebView2 SDK
+        shell: pwsh
+        run: |
+          $index = Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/index.json"
+          $ver = ($index.versions | Where-Object { $_ -notmatch '-' })[-1]
+          Write-Host "WebView2 SDK $ver"
+          Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$ver/microsoft.web.webview2.$ver.nupkg" -OutFile wv2.nupkg
+          Expand-Archive wv2.nupkg -DestinationPath wv2 -Force
+          New-Item -ItemType Directory -Force poc/webview/tools/sdk | Out-Null
+          Copy-Item wv2/lib/net462/Microsoft.Web.WebView2.Core.dll poc/webview/tools/sdk/
+          Copy-Item wv2/lib/net462/Microsoft.Web.WebView2.WinForms.dll poc/webview/tools/sdk/
+          Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll poc/webview/tools/sdk/
+          Copy-Item wv2.nupkg poc/webview/tools/webview2.nupkg
+
+      - name: Build native helper
+        shell: bash
+        run: bash poc/webview/host/build.sh
+
+      - name: Build plugin
+        shell: pwsh
+        working-directory: spw-folia
+        run: .\gradlew.bat plugin --no-daemon -PspwFoliaVersion=0.3.2-test
+
+      - name: Fetch released .spmod
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://github.com/azkbzxf/spw-folia/releases/download/v0.3.1/spw-folia-0.3.1.spmod" -OutFile official.spmod
+
+      - name: Assemble test .spmod
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem spw-folia/build/libs/*.spmod | Select-Object -First 1
+          python .github/scripts/patch-spmod.py official.spmod $plugin.FullName poc/webview/host/build/spw-folia-host.exe dist/spw-folia-0.3.2-test.spmod
+          Get-FileHash dist/spw-folia-0.3.2-test.spmod -Algorithm SHA256 | Format-List
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spw-folia-0.3.2-test
+          path: dist/*.spmod
+          if-no-files-found: error
+
+      - name: Publish rolling test release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $asset = "dist/spw-folia-0.3.2-test.spmod"
+          gh release view test-latest --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload test-latest $asset --clobber --repo $env:GITHUB_REPOSITORY
+            gh release edit test-latest --target $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
+          } else {
+            gh release create test-latest $asset `
+              --repo $env:GITHUB_REPOSITORY `
+              --target $env:GITHUB_SHA `
+              --prerelease `
+              --title "SPW-Folia 个人测试版" `
+              --notes "个人自用测试构建：多屏跟随、Alt 拖动换屏、Ctrl+Alt+F 呼出/关闭。"
+          }
