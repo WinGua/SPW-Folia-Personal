@@ -47,7 +47,15 @@ jobs:
       - name: Build plugin
         shell: pwsh
         working-directory: spw-folia
-        run: .\gradlew.bat plugin --no-daemon -PspwFoliaVersion=0.3.2-test
+        run: |
+          .\gradlew.bat plugin --no-daemon --stacktrace -PspwFoliaVersion=0.3.2-test 2>&1 | Tee-Object -FilePath gradle-build.log
+          if ($LASTEXITCODE -ne 0) {
+            "## Gradle failure" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            "``````" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Get-Content gradle-build.log -Tail 120 | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            "``````" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            exit 1
+          }
 
       - name: Fetch released .spmod
         shell: pwsh
