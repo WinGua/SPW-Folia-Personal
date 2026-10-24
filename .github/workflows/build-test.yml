@@ -31,9 +31,8 @@ concurrency:
 env:
   BASE_TAG: base-v0.3.1
   BASE_ASSET: spw-folia-0.3.1.spmod.zip
-  # The base files are currently pasted into the release notes (user-attachments links), not
-  # attached as release assets, so the release-asset URL 404s. Both are public and the SHA256
-  # pin is what actually guards the payload.
+  # The base files are also pasted into the release notes (user-attachments links); the fallback
+  # keeps the build alive if the release assets are removed. The SHA256 pin is the real guard.
   BASE_FALLBACK_URL: https://github.com/user-attachments/files/33898495/spw-folia-0.3.1.spmod.zip
   BASE_SHA256: 913775c579da91b649742f69149ee974ac3d3b51f4c1cd0f11befc5c932f8ba6
   SPW_FOLIA_VERSION: 0.3.2-test.${{ github.run_number }}
@@ -72,6 +71,9 @@ jobs:
           }
           Expand-Archive base.zip -DestinationPath base-pkg -Force
           Write-Host "base verified: $actual"
+          # `gh` exits non-zero when the asset is missing; the pwsh step wrapper propagates the
+          # stale $LASTEXITCODE even though the fallback download succeeded, failing the step.
+          $global:LASTEXITCODE = 0
 
       - name: Stage WebView2 SDK from the verified base package
         shell: pwsh
