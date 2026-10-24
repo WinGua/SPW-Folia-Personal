@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - test
+      - main
 
 permissions:
   contents: write
