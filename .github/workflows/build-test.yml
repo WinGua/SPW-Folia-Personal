@@ -1,7 +1,20 @@
 name: build-test
 
-# Personal test build: builds the plugin and the native helper, wraps them into the published
-# .spmod, and publishes the result as the rolling pre-release `test-latest`.
+# Personal cloud build (no local toolchain).
+#
+# The repository does not carry Folia's web bundle or the settings UI dist — both are generated
+# from Folia's own sources outside this repo. Every build therefore starts from the pinned
+# official 0.3.1 package (`base-v0.3.1` release asset in this repo) and replaces only the parts
+# this repo builds:
+#   classes/ (+ lib/, META-INF/)  <- `gradlew plugin`
+#   native/                       <- poc/webview/host/build.sh
+#
+# All tool versions are pinned. The WebView2 SDK used to compile the helper is taken straight
+# from the verified base package (`base-pkg/native/*.dll`), and the same dlls are shipped in
+# `native/`, so the exe and its assemblies can never disagree. Mixing SDK versions inside one
+# package (exe built against latest NuGet + dlls from the base package) fails at CLR activation
+# with FileLoadException 0x80131040 before Main(): the plugin spawns the helper, sees the
+# process start, then silently shows nothing.
 on:
   workflow_dispatch:
   push:
@@ -10,6 +23,16 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: build-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BASE_TAG: base-v0.3.1
+  BASE_ASSET: spw-folia-0.3.1.spmod.zip
+  BASE_SHA256: 913775c579da91b649742f69149ee974ac3d3b51f4c1cd0f11befc5c932f8ba6
+  SPW_FOLIA_VERSION: 0.3.2-test.${{ github.run_number }}
 
 jobs:
   build:
@@ -26,63 +49,114 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Restore WebView2 SDK
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Download pinned base package
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY `
+            --pattern $env:BASE_ASSET --output base.zip --clobber
+          $actual = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $env:BASE_SHA256) {
+            throw "base package sha256 mismatch: got $actual"
+          }
+          Expand-Archive base.zip -DestinationPath base-pkg -Force
+          Write-Host "base verified: $actual"
+
+      - name: Stage WebView2 SDK from the verified base package
         shell: pwsh
         run: |
-          $index = Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/index.json"
-          $ver = ($index.versions | Where-Object { $_ -notmatch '-' })[-1]
-          Write-Host "WebView2 SDK $ver"
-          Invoke-WebRequest "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$ver/microsoft.web.webview2.$ver.nupkg" -OutFile wv2.nupkg
-          Expand-Archive wv2.nupkg -DestinationPath wv2 -Force
           New-Item -ItemType Directory -Force poc/webview/tools/sdk | Out-Null
-          Copy-Item wv2/lib/net462/Microsoft.Web.WebView2.Core.dll poc/webview/tools/sdk/
-          Copy-Item wv2/lib/net462/Microsoft.Web.WebView2.WinForms.dll poc/webview/tools/sdk/
-          Copy-Item wv2/runtimes/win-x64/native/WebView2Loader.dll poc/webview/tools/sdk/
-          Copy-Item wv2.nupkg poc/webview/tools/webview2.nupkg
+          foreach ($dll in @(
+            'Microsoft.Web.WebView2.Core.dll',
+            'Microsoft.Web.WebView2.WinForms.dll',
+            'WebView2Loader.dll'
+          )) {
+            Copy-Item "base-pkg/native/$dll" poc/webview/tools/sdk/
+          }
+          Write-Host "WebView2 SDK staged from base-pkg/native (compile-time == shipped)"
 
       - name: Build native helper
         shell: bash
         run: bash poc/webview/host/build.sh
 
+      - name: Verify WebView2 assembly versions
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass `
+            -File .github/scripts/verify-native.ps1 -NativeDir poc/webview/host/build
+
+      - name: Smoke-test native helper
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $native = (Resolve-Path poc/webview/host/build).Path
+          $helperArgs = @(
+            '--bundle', (Resolve-Path base-pkg/web).Path,
+            '--windowed', '--width', '960', '--height', '540',
+            '--screenshot', (Join-Path (Get-Location) 'dist/smoke.png'),
+            '--shot-at', '3000', '--duration', '6000', '--no-overlay'
+          )
+          $p = Start-Process -FilePath (Join-Path $native 'spw-folia-host.exe') `
+            -ArgumentList $helperArgs -WorkingDirectory $native `
+            -RedirectStandardError dist/smoke-stderr.log `
+            -RedirectStandardOutput dist/smoke-stdout.log -PassThru
+          if (-not $p.WaitForExit(30000)) {
+            $p.Kill()
+            throw "helper did not exit within 30 s"
+          }
+          $tail = if (Test-Path dist/smoke-stdout.log) { Get-Content dist/smoke-stdout.log -Tail 8 } else { @() }
+          $tail
+          "exit=$($p.ExitCode)"
+          $err = if (Test-Path dist/smoke-stderr.log) { Get-Content dist/smoke-stderr.log -Raw } else { "" }
+          if ($err -match 'FileLoadException|TypeLoadException|BadImageFormatException|MissingMethodException') {
+            throw "helper failed to load its assemblies: $err"
+          }
+          # Rendering can be unavailable on a headless runner; that is reported, not fatal.
+          if ($p.ExitCode -ne 0) {
+            Write-Warning "helper exited with code $($p.ExitCode) (WebView2 rendering may be unavailable here)"
+          }
+
       - name: Build plugin
         shell: pwsh
         working-directory: spw-folia
-        env:
-          SPW_FOLIA_VERSION: 0.3.2-test
         run: |
-          .\gradlew.bat plugin --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath gradle-build.log
+          .\gradlew.bat plugin --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath ..\gradle-build.log
           if ($LASTEXITCODE -ne 0) {
             "## Gradle failure" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
             "``````" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-            Get-Content gradle-build.log -Tail 120 | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Get-Content ..\gradle-build.log -Tail 120 | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
             "``````" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
             exit 1
           }
 
-      - name: Fetch released .spmod
-        shell: pwsh
-        run: |
-          Invoke-WebRequest "https://github.com/azkbzxf/spw-folia/releases/download/v0.3.1/spw-folia-0.3.1.spmod" -OutFile official.spmod
-
-      - name: Assemble test .spmod
+      - name: Assemble .spmod
         shell: pwsh
         run: |
           $plugin = Get-ChildItem spw-folia/build/libs/*.spmod | Select-Object -First 1
-          python .github/scripts/patch-spmod.py official.spmod $plugin.FullName poc/webview/host/build/spw-folia-host.exe dist/spw-folia-0.3.2-test.spmod
-          Get-FileHash dist/spw-folia-0.3.2-test.spmod -Algorithm SHA256 | Format-List
+          if (-not $plugin) { throw "gradlew plugin produced no .spmod" }
+          $out = "dist/spw-folia-$env:SPW_FOLIA_VERSION.spmod"
+          python .github/scripts/assemble-spmod.py `
+            --base base.zip --plugin $plugin.FullName `
+            --native-dir poc/webview/host/build --out $out
+          Get-FileHash $out -Algorithm SHA256 | Format-List
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: spw-folia-0.3.2-test
+          name: spw-folia-${{ env.SPW_FOLIA_VERSION }}
           path: dist/*.spmod
           if-no-files-found: error
+          retention-days: 14
 
       - name: Publish rolling test release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $asset = "dist/spw-folia-0.3.2-test.spmod"
+          $asset = "dist/spw-folia-$env:SPW_FOLIA_VERSION.spmod"
           gh release view test-latest --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload test-latest $asset --clobber --repo $env:GITHUB_REPOSITORY
@@ -93,5 +167,8 @@ jobs:
               --target $env:GITHUB_SHA `
               --prerelease `
               --title "SPW-Folia 个人测试版" `
-              --notes "个人自用测试构建：多屏跟随、Alt 拖动换屏、Ctrl+Alt+F 呼出/关闭。"
+              --notes "个人自用测试构建：多屏跟随、Alt 拖动换屏、Ctrl+Alt+F 呼出/关闭。底座 base-v0.3.1（WebView2 SDK 与官方 0.3.1 一致）。"
           }
+          "### SPW-Folia $env:SPW_FOLIA_VERSION" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- base sha256: ``$env:BASE_SHA256``" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "- WebView2 SDK: from the verified base package (compile-time == shipped)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
