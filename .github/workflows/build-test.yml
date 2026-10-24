@@ -31,6 +31,10 @@ concurrency:
 env:
   BASE_TAG: base-v0.3.1
   BASE_ASSET: spw-folia-0.3.1.spmod.zip
+  # The base files are currently pasted into the release notes (user-attachments links), not
+  # attached as release assets, so the release-asset URL 404s. Both are public and the SHA256
+  # pin is what actually guards the payload.
+  BASE_FALLBACK_URL: https://github.com/user-attachments/files/33898495/spw-folia-0.3.1.spmod.zip
   BASE_SHA256: 913775c579da91b649742f69149ee974ac3d3b51f4c1cd0f11befc5c932f8ba6
   SPW_FOLIA_VERSION: 0.3.2-test.${{ github.run_number }}
 
@@ -57,7 +61,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release download $env:BASE_TAG --repo $env:GITHUB_REPOSITORY `
-            --pattern $env:BASE_ASSET --output base.zip --clobber
+            --pattern $env:BASE_ASSET --output base.zip --clobber 2>$null
+          if (-not (Test-Path base.zip)) {
+            Write-Host "no release asset attached; using the pinned attachment URL instead"
+            Invoke-WebRequest $env:BASE_FALLBACK_URL -OutFile base.zip
+          }
           $actual = (Get-FileHash base.zip -Algorithm SHA256).Hash.ToLower()
           if ($actual -ne $env:BASE_SHA256) {
             throw "base package sha256 mismatch: got $actual"
