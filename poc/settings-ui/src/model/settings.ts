@@ -146,7 +146,7 @@ export const DEFAULT_SUBTITLE_SETTINGS: SubtitleSettings = {
 
 /** Mirrored Folia storage keys (canonical tree in packaging/testdata/default-settings.json). */
 export const DEFAULT_LYRIC_MOTION = 0.8;
-export const DEFAULT_TEXTURE_RESOLUTION = 1.5;
+export const DEFAULT_TEXTURE_RESOLUTION = 1;
 
 export const DEFAULT_COMMON_BACKGROUND: CommonBackgroundSettings = {
     opacity: 0.75,
@@ -267,8 +267,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             styleTunings: { ...state.styleTunings, [mode]: { ...state.styleTunings[mode], ...patch } },
         })),
     resetStyleTuning: mode =>
-        set(state => ({
-            styleTunings: { ...state.styleTunings, [mode]: { ...STYLE_TUNING_DEFAULTS[mode] } },
+        set(() => ({
+            styleTunings: { ...JSON.parse(JSON.stringify(STYLE_TUNING_DEFAULTS)), [mode]: { ...STYLE_TUNING_DEFAULTS[mode] } },
         })),
 
     transparentPlayerBackground: false,
@@ -312,8 +312,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             backgroundTunings: { ...state.backgroundTunings, [mode]: { ...state.backgroundTunings[mode], ...patch } },
         })),
     resetBackgroundTuning: mode =>
-        set(state => ({
-            backgroundTunings: { ...state.backgroundTunings, [mode]: { ...BACKGROUND_TUNING_DEFAULTS[mode] } },
+        set(() => ({
+            backgroundTunings: { ...JSON.parse(JSON.stringify(BACKGROUND_TUNING_DEFAULTS)), [mode]: { ...BACKGROUND_TUNING_DEFAULTS[mode] } },
         })),
     commonBackground: { ...DEFAULT_COMMON_BACKGROUND },
     setCommonBackground: patch => set(state => ({ commonBackground: { ...state.commonBackground, ...patch } })),
