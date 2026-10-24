@@ -73,7 +73,12 @@ spmod {
     PluginProvider = "azkbzxf"
     PluginHasConfig = false
     PluginOpenSourceUrl = "https://github.com/azkbzxf/spw-folia"
-    PluginPermissions = listOf(PluginPermission.CLASS_TRANSFORM, PluginPermission.LIBRARY_READ)
+    // v0.3.2: KEY_BINDINGS backs the user-configurable open/close shortcut (SPW 快捷键管理).
+    PluginPermissions = listOf(
+        PluginPermission.CLASS_TRANSFORM,
+        PluginPermission.LIBRARY_READ,
+        PluginPermission.KEY_BINDINGS
+    )
 }
 
 // ---------------------------------------------------------------------------------------------

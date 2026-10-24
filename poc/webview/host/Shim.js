@@ -338,6 +338,14 @@
     // when the overlay is open we do nothing here; a second ESC (overlay closed) reaches the host,
     // which closes the window with reason "user".
     if (e.key === 'Escape' && isSettingsOpen()) return;
+    // SPW's in-app shortcut only fires while SPW owns focus; once this fullscreen window is
+    // focused the key lands here instead, which is why the toggle could open but never close.
+    // The registered action's default combo (Ctrl+Alt+F) closes the window from here.
+    if (e.ctrlKey && e.altKey && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault();
+      post({ type: 'action', name: 'close' });
+      return;
+    }
     post({ type: 'key', key: e.key, ctrl: !!e.ctrlKey, alt: !!e.altKey, shift: !!e.shiftKey });
     // F1 is the agreed open/close trigger, routed through the same ui actions the host uses.
     if (e.key === 'F1') {
@@ -362,6 +370,18 @@
       return;
     }
     post({ type: 'action', name: 'close' });
+  }, true);
+
+  // Multi-monitor: Alt+left-drag anywhere on the player page moves the borderless window to another
+  // monitor. The host hands the window to Windows' native move loop (WM_NCLBUTTONDOWN/HTCAPTION) and
+  // re-fullscreens on the monitor it was dropped on; skipping the settings overlay keeps its inputs
+  // and sliders working normally.
+  document.addEventListener('mousedown', function (e) {
+    if (!e || e.button !== 0 || !e.altKey) return;
+    if (isSettingsOpen()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    post({ type: 'windowDrag' });
   }, true);
 
   // ---------------------------------------------------------------- rAF metrics

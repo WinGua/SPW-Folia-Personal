@@ -4,6 +4,7 @@
 package dev.spw.folia
 
 import androidx.compose.runtime.Composable
+import com.xuncorp.spw.workshop.api.ActionShortcut
 import com.xuncorp.spw.workshop.api.PluginContext
 import com.xuncorp.spw.workshop.api.PluginPermission
 import com.xuncorp.spw.workshop.api.SpwPlugin
@@ -60,6 +61,13 @@ class FoliaPlugin(
 
     private var methodHook: HookHandle? = null
 
+    /**
+     * v0.3.2: the user-editable shortcut that opens/closes the visualizer. Registered through the
+     * host's [com.xuncorp.spw.workshop.api.KeyBindingManager], so SPW's own 快捷键 settings own the
+     * key combination (in-app by default, global when the user enables it there).
+     */
+    private var toggleShortcut: AutoCloseable? = null
+
     /** Legacy Swing fallback, only used when the native helper cannot be found/spawned. */
     private var swingFallbackWindow: JFrame? = null
 
@@ -110,6 +118,9 @@ class FoliaPlugin(
         }
         bridge.onClosed = { reason -> log("folia window closed (reason=$reason); plugin stays loaded") }
         startExtensionWatch()
+        // Registered before the hook checks: the shortcut is independent of the 更多 menu injection
+        // and should keep working even when a host build's flyout target cannot be resolved.
+        registerToggleShortcut()
 
         val version = hostVersion
         if (version == null || version < HostTargets.Version.MIN_SUPPORTED) {
@@ -164,6 +175,8 @@ class FoliaPlugin(
 
     override fun stop() {
         log("stop")
+        runCatching { toggleShortcut?.close() }.onFailure { log("shortcut unregister failed: $it") }
+        toggleShortcut = null
         runCatching { methodHook?.unhook() }.onFailure { log("unhook failed: $it") }
         methodHook = null
         runCatching { bridge.stop() }.onFailure { log("bridge stop failed: $it") }
@@ -331,6 +344,55 @@ class FoliaPlugin(
         dismiss.invoke(popupState)
     }
 
+    // -------------------------------------------------------------- shortcut ----
+
+    /**
+     * Registers the open/close shortcut with the host.
+     *
+     * The binding itself lives in SPW (快捷键管理): the default shortcut is in-app only and
+     * `hasGlobal = true` lets the user promote it to a system-wide key there. Requires the
+     * `key-bindings` permission declared in build.gradle.kts; without it the menu entry keeps
+     * working and only the shortcut is skipped.
+     */
+    private fun registerToggleShortcut() {
+        val granted = runCatching {
+            WorkshopApi.manager.isPermissionGranted(PluginPermission.KEY_BINDINGS)
+        }.getOrDefault(false)
+        if (!granted) {
+            log("KEY_BINDINGS not granted; shortcut not registered (menu entry unaffected)")
+            return
+        }
+        runCatching {
+            WorkshopApi.manager.keyBindingManager.register(
+                actionId = TOGGLE_ACTION_ID,
+                title = "呼出 / 关闭 Folia 歌词",
+                defaultShortcut = ActionShortcut(KeyEvent.VK_F, ActionShortcut.CONTROL or ActionShortcut.ALT),
+                hasGlobal = true,
+                handler = Runnable { toggleFoliaWindow() }
+            )
+        }.onSuccess {
+            toggleShortcut = it
+            log("shortcut registered action=$TOGGLE_ACTION_ID default=Ctrl+Alt+F global=configurable")
+        }.onFailure {
+            log("shortcut registration failed: ${it::class.java.name}: ${it.message}")
+        }
+    }
+
+    /** One shortcut action: open when no session is running, otherwise close the running one. */
+    private fun toggleFoliaWindow() {
+        try {
+            if (bridge.isRunning()) {
+                log("shortcut: closing Folia window")
+                bridge.stop()
+            } else {
+                log("shortcut: opening Folia window")
+                openFolia()
+            }
+        } catch (t: Throwable) {
+            log("shortcut toggle failed: ${t::class.java.name}: ${t.message}")
+        }
+    }
+
     // -------------------------------------------------------------- window ----
 
     /**
@@ -421,6 +483,9 @@ class FoliaPlugin(
         /** Hook registration retries while the plugin's "started" transition settles. */
         private const val HOOK_RETRY_COUNT = 20
         private const val HOOK_RETRY_DELAY_MS = 500L
+
+        /** v0.3.2: key-binding action id shown in SPW's shortcut settings. */
+        private const val TOGGLE_ACTION_ID = "toggle-folia-visualizer"
 
         /** Dev checkout root, used only as a fallback while assets are not packaged next to the plugin. */
         private const val DEV_ROOT = "D:/输出目录/dsh2"
