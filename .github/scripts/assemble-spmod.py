@@ -18,6 +18,7 @@ Usage:
 """
 import argparse
 import hashlib
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -31,6 +32,7 @@ NATIVE_FILES = (
 )
 REQUIRED_BASE = ("web/index.html", "web/settings/settings-ui.js")
 REQUIRED_PLUGIN = ("META-INF/MANIFEST.MF", "META-INF/extensions.idx")
+SETTINGS_UI = "web/settings/settings-ui.js"
 REQUIRED_MANIFEST_KEYS = ("Plugin-Id", "Plugin-Class", "Plugin-Version", "Plugin-Name")
 # Fixed timestamp keeps the output byte-for-byte reproducible for the same inputs.
 FIXED_DATE = (2026, 1, 1, 0, 0, 0)
@@ -57,6 +59,30 @@ def write_entry(zf: zipfile.ZipFile, name: str, data: bytes, seen: set) -> None:
     info.compress_type = zipfile.ZIP_DEFLATED
     info.external_attr = 0o644 << 16
     zf.writestr(info, data)
+
+
+def patch_settings_ui(data: bytes) -> bytes:
+    """Make the pre-built settings UI default to textureResolution 1.0 instead of 1.5.
+
+    The base package ships a compiled bundle whose store default (and the sonnet/tempera style
+    defaults) are 1.5. The UI can publish those defaults before it hydrates the plugin's tree,
+    which is what makes a fresh install show 1.5 despite the bundled seed. Rewrite the defaults in
+    the bundle so both paths agree; fail loudly if the pinned base no longer matches.
+    """
+    text = data.decode("utf-8")
+    match = re.search(r"textureResolution:([A-Za-z_$][\w$]*),setTextureResolution", text)
+    if not match:
+        raise SystemExit("ERROR: settings-ui.js: textureResolution store default not found")
+    ident = match.group(1)
+    const = re.compile(rf"\b{re.escape(ident)}=1\.5\b")
+    if not const.search(text):
+        raise SystemExit(f"ERROR: settings-ui.js: expected {ident}=1.5 not found")
+    text = const.sub(f"{ident}=1", text, count=1)
+    text, count = re.subn(r"textureResolution:1\.5\b", "textureResolution:1", text)
+    if count < 1:
+        raise SystemExit("ERROR: settings-ui.js: no style textureResolution:1.5 default found")
+    print(f"  patched settings-ui.js: store {ident}=1.5 -> 1, {count} style defaults -> 1")
+    return text.encode("utf-8")
 
 
 def main(argv=None) -> int:
@@ -117,7 +143,10 @@ def main(argv=None) -> int:
                 name = info.filename
                 if name.endswith("/") or name.startswith(("classes/", "native/")):
                     continue
-                write_entry(target, name, base_zf.read(name), seen)
+                data = base_zf.read(name)
+                if name == SETTINGS_UI:
+                    data = patch_settings_ui(data)
+                write_entry(target, name, data, seen)
                 kept += 1
 
             # This repo's plugin build: classes/ + any lib/ + the workspace manifest.
