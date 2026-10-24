@@ -4,6 +4,7 @@ package dev.spw.folia
 
 import com.xuncorp.spw.workshop.api.UnstableSpwWorkshopApi
 import com.xuncorp.spw.workshop.api.WorkshopApi
+import com.xuncorp.spw.workshop.api.config.ConfigHelper
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -34,8 +35,9 @@ internal class FoliaSettingsStore(
 
     /** Loads the persisted tree, falling back to the bundled canonical default tree. */
     fun load(): String {
+        var helper: ConfigHelper? = null
         val stored = try {
-            val helper = WorkshopApi.manager.createConfigManager().getConfig()
+            helper = WorkshopApi.manager.createConfigManager().getConfig()
             @Suppress("UNCHECKED_CAST")
             val value = helper.get("settingsJson", "") as? String
             value?.takeIf { it.isNotBlank() && it.trim().startsWith("{") }
@@ -43,10 +45,42 @@ internal class FoliaSettingsStore(
             log("settings load failed: ${t::class.java.name}: ${t.message}")
             null
         }
-        val tree = stored ?: defaultTree()
+        var tree = stored ?: defaultTree()
+        if (stored != null) {
+            helper?.let { tree = migrateTextureDefault(it, tree) }
+        }
         lastSaved = tree
         log("settings loaded (${tree.length} bytes, ${if (stored != null) "persisted" else "default"})")
         return tree
+    }
+
+    /**
+     * One-time normalization of the old texture-resolution default.
+     *
+     * Older builds (and the pre-built settings UI shipped in the base package) used 1.5 as the
+     * default, which the UI could write back into the persisted tree before hydration. Replace it
+     * with 1.0 once and remember that the migration ran, so a user's later deliberate choice of
+     * 1.5 is never overwritten again.
+     */
+    private fun migrateTextureDefault(helper: ConfigHelper, tree: String): String {
+        val migrated = try {
+            helper.get(KEY_TEXTURE_MIGRATED, false) as? Boolean ?: false
+        } catch (_: Throwable) {
+            false
+        }
+        if (migrated) return tree
+        val updated = TEXTURE_15.replace(tree, "\"textureResolution\":1")
+        try {
+            if (updated != tree) {
+                helper.set("settingsJson", updated)
+                log("settings migrated: textureResolution 1.5 -> 1.0")
+            }
+            helper.set(KEY_TEXTURE_MIGRATED, true)
+            helper.save()
+        } catch (t: Throwable) {
+            log("settings migration failed: ${t::class.java.name}: ${t.message}")
+        }
+        return updated
     }
 
     /** Debounced persist. No-op when the tree equals the last saved one. */
@@ -106,6 +140,12 @@ internal class FoliaSettingsStore(
 
     companion object {
         private const val DEBOUNCE_MS = 200L
+
+        /** Config key marking the 1.5 -> 1.0 texture default migration as done. */
+        private const val KEY_TEXTURE_MIGRATED = "textureDefaultMigrated"
+
+        /** `"textureResolution":1.5` in the compact JSON the settings UI persists. */
+        private val TEXTURE_15 = Regex("\"textureResolution\"\\s*:\\s*1\\.5(?=[,}])")
 
         @Volatile
         private var flusherArmed = false

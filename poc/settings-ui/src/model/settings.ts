@@ -146,7 +146,7 @@ export const DEFAULT_SUBTITLE_SETTINGS: SubtitleSettings = {
 
 /** Mirrored Folia storage keys (canonical tree in packaging/testdata/default-settings.json). */
 export const DEFAULT_LYRIC_MOTION = 0.8;
-export const DEFAULT_TEXTURE_RESOLUTION = 1.5;
+export const DEFAULT_TEXTURE_RESOLUTION = 1.0;
 
 export const DEFAULT_COMMON_BACKGROUND: CommonBackgroundSettings = {
     opacity: 0.75,

@@ -5,7 +5,7 @@
     "effects": {}
   },
   "styleId": "sonnet",
-  "textureResolution": 1.5,
+  "textureResolution": 1,
   "version": 1,
   "styleTunings": {
     "sonnet": {
@@ -20,7 +20,7 @@
       "showBackgroundDecor": true,
       "enableTransitions": true,
       "outerFrameMode": "full",
-      "textureResolution": 1.5,
+      "textureResolution": 1,
       "postProcessEnabled": false,
       "postProcessGrain": 0.2,
       "postProcessContrast": 0,
@@ -44,7 +44,7 @@
       "layerImageDepth": "back",
       "layerImageFrequency": 0.6,
       "enableTransitions": true,
-      "textureResolution": 1.5,
+      "textureResolution": 1,
       "postProcessEnabled": true,
       "postProcessTextureCompression": false,
       "postProcessGrain": 0.2,
