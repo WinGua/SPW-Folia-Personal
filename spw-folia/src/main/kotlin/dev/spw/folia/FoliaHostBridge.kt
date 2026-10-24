@@ -643,8 +643,6 @@ internal class FoliaHostBridge(
         candidates += File(pluginPath, "lib/x64/spw-folia-host.exe")
         candidates += File(pluginPath, "native/spw-folia-host.exe")
         candidates += File(pluginPath, "native/x64/spw-folia-host.exe")
-        // Dev checkout fallback (task-6 build output); harmless in a packaged plugin.
-        candidates += File(DEV_ROOT, "poc/webview/host/build/spw-folia-host.exe")
         return candidates.firstOrNull { it.isFile }
     }
 
@@ -653,7 +651,6 @@ internal class FoliaHostBridge(
         System.getenv("SPW_FOLIA_WEB")?.takeIf { it.isNotBlank() }?.let { candidates += File(it) }
         candidates += File(pluginPath, "web")
         candidates += File(pluginPath, "web/dist")
-        candidates += File(DEV_ROOT, "poc/webview/dist/dist")
         return candidates.firstOrNull { File(it, "index.html").isFile }
     }
 
@@ -664,7 +661,6 @@ internal class FoliaHostBridge(
         val candidates = mutableListOf<File>()
         System.getenv("SPW_FOLIA_SETTINGS")?.takeIf { it.isNotBlank() }?.let { candidates += File(it) }
         candidates += File(pluginPath, "web/settings")
-        candidates += File(DEV_ROOT, "poc/settings-ui/dist")
         return candidates.firstOrNull { File(it, SETTINGS_ENTRY).isFile }
     }
 
@@ -688,6 +684,5 @@ internal class FoliaHostBridge(
         /** v0.3.0: queue is diffed every 500 ms; controls force an immediate push via queueDirty. */
         private const val QUEUE_CHECK_EVERY_TICKS = 5L
         private const val SETTINGS_ENTRY = "settings-ui.js"
-        private const val DEV_ROOT = "D:/输出目录/dsh2"
     }
 }

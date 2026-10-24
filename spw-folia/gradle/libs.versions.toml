@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.4.20"
-spw-workshop-api = "0.1.0-dev22"
+spw-workshop-api = "0.1.0-dev23"
 jetbrains-compose-multiplatform = "1.12.0"
 
 [libraries]

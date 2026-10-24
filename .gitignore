@@ -1,73 +1,24 @@
-# DSH analysis workspace — NOT part of the redistributable plugin.
-# It contains reverse-engineering artifacts extracted from the proprietary Salt Player
-# for Windows application and reference sources. NEVER publish this directory.
-/work/
-
-# Third-party / generated build outputs
-/node_modules/
-**/node_modules/
+# Build outputs
+**/build/
 **/.gradle/
 **/.kotlin/
-**/build/
-packaging/web/
-packaging/native/
-packaging/out/
-poc/webview/dist/
+/node_modules/
 poc/webview/tools/
-poc/webview/host/out/
-poc/webview/host/build/
-poc/webview/server/out/
-poc/webview/shared/node_modules/
-poc/audio/build/
-poc/audio/measure/
-poc/settings-ui/dist/
-poc/settings-ui/public/thumbs/
-research/settings-ui/
-research/assets/
-spw-folia/notes/
-
-# Runtime test artifacts
+/dist/
+*.spmod
 *.log
 *.shm
-t4.shm
-*.spmod
-poc/hook/shots/*.png
-poc/webview/server/out/
-poc/webview/host/out/
 
-# OS/editor
+# Local analysis / scratch (never part of the plugin)
+/work/
+/.dsh/
+/tmp-inspect/
+/tmp-verify/
+/.tmp-capture/
+spw-folia/.gradle-home/
+
+# OS / editor
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-
-# Local agent state / release artifacts (the .spmod is attached to GitHub Releases, not committed)
-/.dsh/
-/dist/
-/poc/hook/shots/
-
-# Kotlin/JVM compile outputs and generated packaging audit files
-poc/audio/out/
-packaging/SHA256SUMS.txt
-packaging/size-report.json
-
-# hook acceptance evidence: screenshots stay local; docs/archive/acceptance-report.md records the results
-poc/hook/acceptance/
-
-# transient verification fixtures (poc/hook/verify-cover.mjs outputs)
-/tmp-verify/
-
-# local-only hook artifacts: installed-plugin backups and ad-hoc verification fixtures
-poc/hook/backup/
-poc/hook/tmp-verify/
-
-# local verification scratch (screenshots, logs, probes output)
-/tmp-inspect/
-poc/webview/host/repro/*.exe
-poc/webview/host/repro/*.dll
-
-# promo-site capture scratch (raw recordings, ffmpeg binary, screenshots)
-/.tmp-capture/
-
-# isolated Gradle home used by the local build (Aliyun-mirror workaround)
-spw-folia/.gradle-home/

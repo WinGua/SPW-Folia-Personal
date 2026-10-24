@@ -4,7 +4,6 @@ package dev.spw.folia
 
 import com.xuncorp.spw.workshop.api.UnstableSpwWorkshopApi
 import com.xuncorp.spw.workshop.api.WorkshopApi
-import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -90,18 +89,15 @@ internal class FoliaSettingsStore(
     }
 
     private fun defaultTree(): String {
-        val candidates = listOf(
-            { javaClass.getResourceAsStream("/default-settings.json") },
-            { File(FoliaPlugin.devRoot(), "packaging/testdata/default-settings.json").inputStream() }
-        )
-        for (candidate in candidates) {
-            try {
-                val stream = candidate() ?: continue
-                return stream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trim()
-            } catch (_: Throwable) {
-            }
+        return try {
+            javaClass.getResourceAsStream("/default-settings.json")
+                ?.bufferedReader(Charsets.UTF_8)
+                ?.use { it.readText() }
+                ?.trim()
+                ?: "{}"
+        } catch (_: Throwable) {
+            "{}"
         }
-        return "{}"
     }
 
     companion object {

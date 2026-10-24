@@ -166,13 +166,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $tag = "test-latest"
           $asset = "dist/spw-folia-$env:SPW_FOLIA_VERSION.spmod"
-          gh release view test-latest --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload test-latest $asset --clobber --repo $env:GITHUB_REPOSITORY
-            gh release edit test-latest --target $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
+          $assetName = Split-Path $asset -Leaf
+          $view = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets 2>$null
+          if ($LASTEXITCODE -eq 0 -and $view) {
+            # Keep exactly one personal test build in the rolling release.
+            $existing = ($view | ConvertFrom-Json).assets | ForEach-Object { $_.name }
+            foreach ($name in $existing) {
+              if ($name -ne $assetName) {
+                Write-Host "removing old release asset $name"
+                gh release delete-asset $tag $name --yes --repo $env:GITHUB_REPOSITORY
+              }
+            }
+            gh release upload $tag $asset --clobber --repo $env:GITHUB_REPOSITORY
+            gh release edit $tag --target $env:GITHUB_SHA --repo $env:GITHUB_REPOSITORY
           } else {
-            gh release create test-latest $asset `
+            gh release create $tag $asset `
               --repo $env:GITHUB_REPOSITORY `
               --target $env:GITHUB_SHA `
               --prerelease `

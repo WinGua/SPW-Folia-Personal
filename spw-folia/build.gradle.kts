@@ -86,49 +86,5 @@ spmod {
     )
 }
 
-// ---------------------------------------------------------------------------------------------
-// Local dev asset staging (task-7)
-//
-// The .spmod format only carries `classes/` + `lib/`, so the native helper and its web bundle are
-// staged next to the plugin by scripts/install-local.sh:
-//   <plugin dir>/host/spw-folia-host.exe + WebView2 dlls
-//   <plugin dir>/web/index.html + assets + settings/settings-ui.js
-//   <plugin dir>/web/default-settings.json
-// Production packaging is a separate task; this task is the dev-only source of that layout.
-// ---------------------------------------------------------------------------------------------
-val repoRoot: File = rootDir.parentFile
-val devHostDir = File(repoRoot, "poc/webview/host/build")
-// packaging/native is re-staged by the host owner (task-9): prefer it over the dev checkout so
-// local installs test exactly what ships.
-val packagedNativeDir = File(repoRoot, "packaging/native")
-val hostSrcDir = if (packagedNativeDir.isDirectory) packagedNativeDir else devHostDir
-val devWebDir = File(repoRoot, "poc/webview/dist/dist")
-val devSettingsDir = File(repoRoot, "poc/settings-ui/dist")
-val devDefaultSettings = File(repoRoot, "packaging/testdata/default-settings.json")
-
-val syncDevAssets by tasks.registering(Sync::class) {
-    description = "Stages the native helper + Folia web bundle for local plugin installs."
-    group = "spw-folia"
-    into(layout.buildDirectory.dir("plugin-root"))
-    from(hostSrcDir) {
-        include(
-            "spw-folia-host.exe",
-            "spw-folia-host.exe.config",
-            "WebView2Loader.dll",
-            "Microsoft.Web.WebView2.Core.dll",
-            "Microsoft.Web.WebView2.WinForms.dll"
-        )
-        into("host")
-    }
-    from(devWebDir) { into("web") }
-    from(devSettingsDir) {
-        include("settings-ui.js", "assets/**", "thumbs/**")
-        into("web/settings")
-    }
-    from(devDefaultSettings) { into("web") }
-    onlyIf { hostSrcDir.isDirectory && devWebDir.isDirectory }
-}
-
-tasks.named("plugin") {
-    dependsOn(syncDevAssets)
-}
+// Local-dev asset staging lives outside this repo: cloud builds take the web bundle from the
+// pinned base package, and the helper output is packaged by .github/scripts/assemble-spmod.py.

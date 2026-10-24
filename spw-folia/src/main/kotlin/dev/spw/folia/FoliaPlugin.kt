@@ -487,13 +487,8 @@ class FoliaPlugin(
         /** v0.3.2: key-binding action id shown in SPW's shortcut settings. */
         private const val TOGGLE_ACTION_ID = "toggle-folia-visualizer"
 
-        /** Dev checkout root, used only as a fallback while assets are not packaged next to the plugin. */
-        private const val DEV_ROOT = "D:/输出目录/dsh2"
-
         @Volatile
         private var instance: FoliaPlugin? = null
-
-        fun devRoot(): File = File(DEV_ROOT)
 
         fun logStatic(message: String) {
             instance?.log(message)
