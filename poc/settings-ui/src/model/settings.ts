@@ -267,8 +267,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             styleTunings: { ...state.styleTunings, [mode]: { ...state.styleTunings[mode], ...patch } },
         })),
     resetStyleTuning: mode =>
-        set(() => ({
-            styleTunings: { ...JSON.parse(JSON.stringify(STYLE_TUNING_DEFAULTS)), [mode]: { ...STYLE_TUNING_DEFAULTS[mode] } },
+        set(state => ({
+            styleTunings: { ...state.styleTunings, [mode]: { ...STYLE_TUNING_DEFAULTS[mode] } },
         })),
 
     transparentPlayerBackground: false,
@@ -312,8 +312,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             backgroundTunings: { ...state.backgroundTunings, [mode]: { ...state.backgroundTunings[mode], ...patch } },
         })),
     resetBackgroundTuning: mode =>
-        set(() => ({
-            backgroundTunings: { ...JSON.parse(JSON.stringify(BACKGROUND_TUNING_DEFAULTS)), [mode]: { ...BACKGROUND_TUNING_DEFAULTS[mode] } },
+        set(state => ({
+            backgroundTunings: { ...state.backgroundTunings, [mode]: { ...BACKGROUND_TUNING_DEFAULTS[mode] } },
         })),
     commonBackground: { ...DEFAULT_COMMON_BACKGROUND },
     setCommonBackground: patch => set(state => ({ commonBackground: { ...state.commonBackground, ...patch } })),
